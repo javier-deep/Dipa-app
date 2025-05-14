@@ -8,7 +8,8 @@ import Datos from '../screens/Datos';
 import Avatar from '../screens/Avatar';
 import RegistroC from '../screens/RegistroC';
 import Login from '../screens/Login';
-import Cursos from '../screens/Cursos'
+import Cursos from '../screens/Cursos';
+import Principal from '../screens/Principal';
 
 const Stack = createNativeStackNavigator();
 
@@ -25,6 +26,7 @@ export default function AppNavigator() {
       <Stack.Screen name="RegistroC" component={RegistroC}/>
       <Stack.Screen name="Login" component={Login} />
       <Stack.Screen name="Cursos" component={Cursos}/>
+      <Stack.Screen name="Principal" component={Principal}/>
     </Stack.Navigator>
   );
 }

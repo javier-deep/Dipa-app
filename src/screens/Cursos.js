@@ -1,24 +1,35 @@
-import React, { useState, useRef } from 'react';
-import { 
-  StyleSheet, 
-  Text, 
-  View, 
-  TouchableOpacity, 
-  Image, 
-  ScrollView,
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  StyleSheet,
+  Text,
+  View,
+  TouchableOpacity,
+  Modal,
+  Alert,
+  ActivityIndicator,
   SafeAreaView,
+  ScrollView,
+  Image,
   Dimensions,
   StatusBar,
   Animated,
-  Easing,
-  Modal
+  Easing
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import QRCode from 'react-native-qrcode-svg';
+import { Camera } from 'expo-camera';
 
 const { width } = Dimensions.get('window');
 
-export default function App() {
+export default function CursosApp() {
   const [selectedCourse, setSelectedCourse] = useState(null);
+  const [completedCourses, setCompletedCourses] = useState([]);
+  const [showScanner, setShowScanner] = useState(false);
+  const [streakCount, setStreakCount] = useState(1);
+  const [showCongratulations, setShowCongratulations] = useState(false);
+  const [cameraPermission, setCameraPermission] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+
 
   // Datos completos de los cursos
   const courses = [
@@ -37,10 +48,10 @@ export default function App() {
         requirements: "Ropa cómoda y cuaderno de notas"
       }
     },
-    { 
-      id: 2, 
-      title: "Supervivencia en Naturaleza", 
-      icon: "🦊", 
+    {
+      id: 2,
+      title: "Supervivencia en Naturaleza",
+      icon: "🦊",
       color: "#1a397c",
       details: {
         description: "Técnicas esenciales de supervivencia en entornos naturales. Aprenderás a conseguir agua, hacer fuego, construir refugios y orientarte sin equipamiento.",
@@ -52,10 +63,10 @@ export default function App() {
         requirements: "Ninguno"
       }
     },
-    { 
-      id: 3, 
-      title: "Primeros Auxilios Avanzados", 
-      icon: "🦁", 
+    {
+      id: 3,
+      title: "Primeros Auxilios Avanzados",
+      icon: "🦁",
       color: "#1a397c",
       details: {
         description: "Curso avanzado de primeros auxilios para situaciones críticas. Incluye RCP, manejo de hemorragias y atención a traumatismos.",
@@ -67,10 +78,10 @@ export default function App() {
         requirements: "Certificado básico de primeros auxilios"
       }
     },
-    { 
-      id: 4, 
-      title: "Manejo de Crisis", 
-      icon: "🐊", 
+    {
+      id: 4,
+      title: "Manejo de Crisis",
+      icon: "🐊",
       color: "#1a397c",
       details: {
         description: "Desarrolla habilidades para manejar situaciones de crisis y emergencias. Trabajo en equipo, toma de decisiones bajo presión y comunicación efectiva.",
@@ -82,10 +93,10 @@ export default function App() {
         requirements: "Conexión a internet estable"
       }
     },
-    { 
-      id: 5, 
-      title: "Rastreo y Seguimiento", 
-      icon: "🐘", 
+    {
+      id: 5,
+      title: "Rastreo y Seguimiento",
+      icon: "🐘",
       color: "#1a397c",
       details: {
         description: "Aprende técnicas profesionales de rastreo y seguimiento en diferentes terrenos. Ideal para rescatistas y equipos de búsqueda.",
@@ -97,10 +108,10 @@ export default function App() {
         requirements: "Botas para campo"
       }
     },
-    { 
-      id: 6, 
-      title: "Defensa Personal", 
-      icon: "🦅", 
+    {
+      id: 6,
+      title: "Defensa Personal",
+      icon: "🦅",
       color: "#1a397c",
       details: {
         description: "Técnicas básicas y avanzadas de defensa personal adaptadas a diferentes contextos y situaciones de peligro.",
@@ -113,6 +124,78 @@ export default function App() {
       }
     },
   ];
+
+   // Solicitar permisos al cargar el componente
+  
+   useEffect(() => {
+    const requestPermission = async () => {
+      try {
+        const { status } = await Camera.requestCameraPermissionsAsync();
+        setCameraPermission(status === 'granted');
+      } catch (error) {
+        console.error("Error al solicitar permisos:", error);
+        Alert.alert("Error", "No se pudo solicitar permiso para la cámara");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    requestPermission();
+  }, []);
+
+  const handleQRScanned = ({ data }) => {
+    setShowScanner(false);
+    if (data.includes('VALID_COURSE_QR')) {
+      if (selectedCourse && !completedCourses.includes(selectedCourse.id)) {
+        setCompletedCourses([...completedCourses, selectedCourse.id]);
+        setStreakCount(streakCount + 1);
+        setShowCongratulations(true);
+      }
+    } else {
+      Alert.alert('Código inválido', 'Este código QR no es válido para completar el curso');
+    }
+  };
+
+  const handleScanPress = async () => {
+    if (!cameraPermission) {
+      try {
+        setIsLoading(true);
+        const { status } = await Camera.requestCameraPermissionsAsync();
+        setCameraPermission(status === 'granted');
+        if (status === 'granted') {
+          setShowScanner(true);
+        }
+      } catch (error) {
+        console.error("Error al solicitar permisos:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    } else {
+      setShowScanner(true);
+    }
+  };
+  // Componente para la pantalla de felicitaciones
+  const CongratulationsModal = () => (
+    <Modal
+      animationType="fade"
+      transparent={true}
+      visible={showCongratulations}
+      onRequestClose={() => setShowCongratulations(false)}
+    >
+      <View style={styles.congratsContainer}>
+        <View style={styles.congratsContent}>
+          <Text style={styles.congratsNumber}>{streakCount}</Text>
+          <Text style={styles.congratsTitle}>¡Felicidades!</Text>
+          <Text style={styles.congratsSubtitle}>Sigue así y no pierdas tu racha</Text>
+          <TouchableOpacity 
+            style={styles.congratsButton}
+            onPress={() => setShowCongratulations(false)}
+          >
+            <Text style={styles.congratsButtonText}>Continuar</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
 
   const FlipCard = ({ course }) => {
     const animatedValue = useRef(new Animated.Value(0)).current;
@@ -145,7 +228,7 @@ export default function App() {
       <TouchableOpacity
         activeOpacity={0.8}
         onPress={flipCard}
-        style={[styles.card, course.id === 1 && styles.highlightedCard]}
+        style={[styles.card, completedCourses.includes(course.id) && styles.completedCard]}
       >
         <Animated.View style={[
           styles.flipCard,
@@ -188,6 +271,8 @@ export default function App() {
   const CourseDetailsModal = ({ course, onClose }) => {
     if (!course) return null;
     
+    const isCompleted = completedCourses.includes(course.id);
+    
     return (
       <Modal
         animationType="slide"
@@ -199,37 +284,66 @@ export default function App() {
           <View style={styles.modalContent}>
             <View style={[styles.modalHeader, { backgroundColor: course.color }]}>
               <Text style={styles.modalTitle}>{course.title}</Text>
-              <Text style={styles.modalSubtitle}>Intervenciones oportunas</Text>
+              <Text style={styles.modalSubtitle}>
+                {isCompleted ? '¡Curso completado!' : 'Escanea el QR para completar'}
+              </Text>
             </View>
             
             <ScrollView style={styles.modalBody}>
-              <Text style={styles.modalDescription}>
-                {course.details.description}
-              </Text>
-              
-              <View style={styles.modalFeatures}>
-                <View style={[styles.modalFeatureBox, { backgroundColor: course.color }]}>
-                  <Text style={styles.modalFeatureText}>{course.details.modality}</Text>
+              {isCompleted ? (
+                <View style={styles.qrContainer}>
+                  <Text style={styles.qrTitle}>Certificado de finalización</Text>
+                  <View style={styles.qrCode}>
+                    <QRCode
+                      value={`CERTIFICADO_${course.id}_USER_123_${streakCount}`}
+                      size={200}
+                      color="black"
+                      backgroundColor="white"
+                    />
+                  </View>
+                  <Text style={styles.qrHint}>
+                    Este código verifica que completaste el curso
+                  </Text>
                 </View>
-                <View style={[styles.modalFeatureBox, { backgroundColor: course.color }]}>
-                  <Text style={styles.modalFeatureText}>{course.details.duration}</Text>
-                </View>
-              </View>
-              
-              <View style={styles.modalInfoItem}>
-                <Ionicons name="location-outline" size={20} color="#555" />
-                <Text style={styles.modalInfoText}>{course.details.location}</Text>
-              </View>
-              
-              <View style={styles.modalInfoItem}>
-                <Ionicons name="time-outline" size={20} color="#555" />
-                <Text style={styles.modalInfoText}>{course.details.schedule}</Text>
-              </View>
-              
-              <View style={styles.modalInfoItem}>
-                <Ionicons name="alert-circle-outline" size={20} color="#555" />
-                <Text style={styles.modalInfoText}>Requisitos: {course.details.requirements}</Text>
-              </View>
+              ) : (
+                <>
+                  <Text style={styles.modalDescription}>
+                    {course.details.description}
+                  </Text>
+                  
+                  <View style={styles.modalFeatures}>
+                    <View style={[styles.modalFeatureBox, { backgroundColor: course.color }]}>
+                      <Text style={styles.modalFeatureText}>{course.details.modality}</Text>
+                    </View>
+                    <View style={[styles.modalFeatureBox, { backgroundColor: course.color }]}>
+                      <Text style={styles.modalFeatureText}>{course.details.duration}</Text>
+                    </View>
+                  </View>
+                  
+                  <View style={styles.modalInfoItem}>
+                    <Ionicons name="location-outline" size={20} color="#555" />
+                    <Text style={styles.modalInfoText}>{course.details.location}</Text>
+                  </View>
+                  
+                  <View style={styles.modalInfoItem}>
+                    <Ionicons name="time-outline" size={20} color="#555" />
+                    <Text style={styles.modalInfoText}>{course.details.schedule}</Text>
+                  </View>
+                  
+                  <View style={styles.modalInfoItem}>
+                    <Ionicons name="alert-circle-outline" size={20} color="#555" />
+                    <Text style={styles.modalInfoText}>Requisitos: {course.details.requirements}</Text>
+                  </View>
+                  
+                  <TouchableOpacity 
+                    style={[styles.scanButton, { backgroundColor: course.color }]}
+                    onPress={handleScanPress}
+                  >
+                    <Ionicons name="qr-code-outline" size={24} color="white" />
+                    <Text style={styles.scanButtonText}>Escanear QR de finalización</Text>
+                  </TouchableOpacity>
+                </>
+              )}
             </ScrollView>
             
             <TouchableOpacity 
@@ -244,6 +358,41 @@ export default function App() {
     );
   };
 
+  // Pantalla de carga mientras se verifican permisos
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#1a397c" />
+        <Text style={styles.loadingText}>Solicitando permisos...</Text>
+      </View>
+    );
+  }
+
+  // Pantalla si no hay permisos
+  if (cameraPermission === false) {
+    return (
+      <View style={styles.permissionContainer}>
+        <Ionicons name="camera-off" size={60} color="#1a397c" />
+        <Text style={styles.permissionTitle}>Permiso de cámara requerido</Text>
+        <Text style={styles.permissionText}>
+          Para escanear códigos QR y completar cursos, necesitamos acceso a tu cámara.
+        </Text>
+        <TouchableOpacity
+          style={styles.permissionButton}
+          onPress={async () => {
+            setIsLoading(true);
+            const { status } = await Camera.requestCameraPermissionsAsync();
+            setCameraPermission(status === 'granted');
+            setIsLoading(false);
+          }}
+        >
+          <Text style={styles.permissionButtonText}>Conceder permiso</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  // Interfaz principal
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" />
@@ -272,7 +421,7 @@ export default function App() {
             <View style={[styles.statIcon, { backgroundColor: '#e17055' }]}>
               <Ionicons name="flame" size={16} color="white" />
             </View>
-            <Text style={styles.statValue}>1</Text>
+            <Text style={styles.statValue}>{streakCount}</Text>
           </View>
           
           <View style={styles.statItem}>
@@ -296,6 +445,7 @@ export default function App() {
         <Image 
           source={{ uri: 'https://vignette.wikia.nocookie.net/doblaje/images/f/f2/Alexleon.png/revision/latest?cb=20141225032252&path-prefix=es' }} 
           style={styles.mascotImage} 
+          contentFit="contain"
         />
         <View style={styles.speechBubble}>
           <Text style={styles.speechBubbleText}>
@@ -321,6 +471,24 @@ export default function App() {
         course={selectedCourse} 
         onClose={() => setSelectedCourse(null)} 
       />
+      
+      {/* Modal del escáner QR */}
+      <Modal visible={showScanner} transparent={true} animationType="slide">
+        <View style={styles.scannerContainer}>
+          <Camera
+            onBarCodeScanned={showScanner ? handleQRScanned : undefined}
+            barCodeScannerSettings={{
+              barCodeTypes: [Camera.Constants.BarCodeType.qr],
+            }}
+            style={StyleSheet.absoluteFillObject}
+          />
+          <TouchableOpacity style={styles.closeScanner} onPress={() => setShowScanner(false)}>
+            <Text style={{ color: 'white', fontSize: 20 }}>Cerrar</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
+      
+      <CongratulationsModal />
     </SafeAreaView>
   );
 }
@@ -329,6 +497,52 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+  },
+  loadingText: {
+    marginTop: 20,
+    fontSize: 16,
+    color: '#1a397c',
+  },
+  permissionContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 30,
+    backgroundColor: '#fff',
+  },
+  permissionTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginTop: 20,
+    color: '#1a397c',
+    textAlign: 'center',
+  },
+  permissionText: {
+    fontSize: 16,
+    marginTop: 10,
+    marginBottom: 30,
+    textAlign: 'center',
+    color: '#666',
+    paddingHorizontal: 20,
+  },
+  permissionButton: {
+    backgroundColor: '#1a397c',
+    paddingVertical: 15,
+    paddingHorizontal: 30,
+    borderRadius: 30,
+    width: '80%',
+    alignItems: 'center',
+  },
+  permissionButtonText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
   header: {
     flexDirection: 'row',
@@ -422,8 +636,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e0e0e0',
   },
-  highlightedCard: {
-    borderColor: '#1a397c',
+  completedCard: {
+    borderColor: '#6ab04c',
     borderWidth: 2,
   },
   flipCard: {
@@ -437,14 +651,10 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
   },
-
-
   flipCardBack: {
     backgroundColor: 'white',
     backfaceVisibility: 'hidden',
   },
-
-  
   cardContent: {
     width: '100%',
     height: '100%',
@@ -469,14 +679,12 @@ const styles = StyleSheet.create({
     marginTop: 10,
     textAlign: 'center',
   },
-
   cardBackContent: {
     flex: 1,
     padding: 16,
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  
   detailCardTitle: {
     fontSize: 18,
     fontWeight: 'bold',
@@ -489,7 +697,6 @@ const styles = StyleSheet.create({
     color: '#333',
     marginBottom: 15,
   },
-  
   actionButton: {
     marginTop: 12,
     paddingVertical: 8,
@@ -498,14 +705,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     maxWidth: '90%',
   },
-  
   actionButtonText: {
     color: '#fff',
     fontSize: 14,
     fontWeight: 'bold',
     textAlign: 'center',
   },
-  
   modalContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -572,6 +777,113 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalCloseText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  qrContainer: {
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  qrTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  qrCode: {
+    padding: 20,
+    backgroundColor: 'white',
+    borderRadius: 10,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  qrHint: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 10,
+  },
+  scanButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 15,
+    borderRadius: 10,
+    marginTop: 20,
+  },
+  scanButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    marginLeft: 10,
+    fontSize: 16,
+  },
+  scannerContainer: {
+    flex: 1,
+    backgroundColor: 'black',
+  },
+  scannerOverlay: {
+    position: 'absolute',
+    bottom: 50,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  scannerText: {
+    color: 'white',
+    fontSize: 16,
+    textAlign: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    padding: 15,
+    borderRadius: 10,
+  },
+  scannerCloseButton: {
+    position: 'absolute',
+    top: 40,
+    right: 20,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 20,
+    padding: 10,
+  },
+  congratsContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.7)',
+  },
+  congratsContent: {
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 30,
+    alignItems: 'center',
+    width: '80%',
+  },
+  congratsNumber: {
+    fontSize: 60,
+    fontWeight: 'bold',
+    color: '#1a397c',
+  },
+  congratsTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    marginVertical: 10,
+    color: '#333',
+  },
+  congratsSubtitle: {
+    fontSize: 18,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  congratsButton: {
+    backgroundColor: '#1a397c',
+    paddingVertical: 12,
+    paddingHorizontal: 30,
+    borderRadius: 25,
+  },
+  congratsButtonText: {
     color: 'white',
     fontWeight: 'bold',
     fontSize: 16,
