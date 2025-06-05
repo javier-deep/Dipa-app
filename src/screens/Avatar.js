@@ -18,12 +18,8 @@ export default function Avatar({ navigation }) {
       image: require('../../assets/cuaderno.png'),
       position: { top: 150, left: 40, width: 80, height: 100 }
     },
-    { 
-      id: 3, 
-      name: 'Estetoscopio', 
-      image: require('../../assets/estetoscopio.png'),
-      position: { top: 120, left: 80, width: 100, height: 80 }
-    },
+    
+      
     { 
       id: 4, 
       name: 'Botiquín', 

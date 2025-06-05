@@ -11,6 +11,7 @@ import Login from '../screens/Login';
 import Cursos from '../screens/Cursos';
 import Principal from '../screens/Principal';
 
+
 const Stack = createNativeStackNavigator();
 
 export default function AppNavigator() {

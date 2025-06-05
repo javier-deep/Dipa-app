@@ -18,7 +18,7 @@ export default function Datos({ navigation }) {
 
       {/* Imagen del león */}
       <Image
-        source={require('../../assets/leon.gif')} 
+        source={require('../../assets/Datos.gif')} 
         style={styles.image}
       />
 
@@ -76,8 +76,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   image: {
-    width: 120,
-    height: 120,
+    width: 220,
+    height: 220,
     marginVertical: 20,
   },
   infoContainer: {

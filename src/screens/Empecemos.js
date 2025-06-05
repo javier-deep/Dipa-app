@@ -1,18 +1,47 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Image } from "expo-image";
 
 export default function Empecemos({ navigation }) {
+  const [displayText, setDisplayText] = useState('');
+  const fullText = "¡Hola! Yo soy Maxnic.";
+
+  useEffect(() => {
+    // Efecto de escritura
+    let i = 0;
+    const typingInterval = setInterval(() => {
+      if (i < fullText.length) {
+        setDisplayText(fullText.substring(0, i + 1));
+        i++;
+      } else {
+        clearInterval(typingInterval);
+      }
+    }, 80); // Velocidad de escritura (ms por caracter)
+
+    return () => clearInterval(typingInterval);
+  }, []);
+
   return (
     <View style={styles.container}>
+      {/* GIF de fondo */}
+      <Image
+        source={require('../../assets/empecemos.gif')}
+        style={styles.backgroundImage}
+        contentFit="cover"
+      />
+      
+      {/* Capa semitransparente para mejorar legibilidad */}
+      <View style={styles.overlay} />
+      
+      {/* Contenido */}
       <View style={styles.dialogContainer}>
-        <Text style={styles.speechBubble}>¡Hola! Yo soy Maxnic.</Text>
+        <Text style={styles.speechBubble}>
+          {displayText}
+          {displayText === fullText ? '' : ''} {/* Cursor que desaparece al completar */}
+        </Text>
       </View>
-      <View style={styles.imageAndButtonContainer}>
-        <Image
-          source={require('../../assets/leon.gif')} // Asegúrate de que el archivo esté en la ruta correcta
-          style={styles.image}
-        />
+      
+      <View style={styles.buttonContainer}>
         <TouchableOpacity
           style={styles.continueButton}
           onPress={() => navigation.navigate('Continuar')}
@@ -27,46 +56,64 @@ export default function Empecemos({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff', // Fondo blanco
-    justifyContent: 'flex-start',
-    alignItems: 'center',
-    paddingVertical: 20,
+    position: 'relative',
+  },
+  backgroundImage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: null,
+    height: '100%',
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255, 255, 255, 0)',
+    marginHorizontal: 40,
   },
   dialogContainer: {
-    marginTop: 250, // Espacio superior
-    backgroundColor: '#f0f0f0',
-    padding: 10,
-    borderRadius: 10,
+    marginTop: 140,
+    backgroundColor: 'rgb(240, 240, 240)',
+    padding: 15,
+    borderRadius: 15,
     alignItems: 'center',
     maxWidth: '80%',
+    alignSelf: 'flex-end',
+    marginRight: 40,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 50,
+    elevation: 30,
   },
   speechBubble: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#000000',
     textAlign: 'center',
   },
-  imageAndButtonContainer: {
-    flexDirection: 'row', // Imagen y botón en fila
-    justifyContent: 'space-between',
+  buttonContainer: {
+    position: 'absolute',
+    bottom: 100,
+    width: '135%',
     alignItems: 'center',
-    width: '90%',
-    marginTop: 50,
-  },
-  image: {
-    width: 200, // Tamaño del león
-    height: 200,
   },
   continueButton: {
     backgroundColor: '#0056b3',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 25,
+    paddingVertical: 15,
+    paddingHorizontal: 40,
+    borderRadius: 30,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
     elevation: 5,
   },
   continueButtonText: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#ffffff',
+    letterSpacing: 1,
   },
 });

@@ -26,7 +26,7 @@ export default function Continuar({ navigation }) {
         <Text style={styles.dialogText}>Antes de rugir juntos, necesito conocerte mejor.</Text>
       </View>
       {/* Imagen */}
-      <Image source={require('../../assets/leon.gif')} style={styles.image} />
+      <Image source={require('../../assets/continuar.gif')} style={styles.image} />
       {/* Espacios de texto */}
       <View style={styles.inputContainer}>
         <Text style={styles.label}>Matrícula</Text>
@@ -70,7 +70,7 @@ const styles = StyleSheet.create({
     height: 30,
     backgroundColor: '#e0e0e0',
     borderRadius: 70,
-    marginTop: 75,
+    marginTop: 65,
     overflow: 'hidden',
   },
   progressBar: {
@@ -78,10 +78,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#0056b3',
   },
   dialogContainer: {
-    marginVertical: 50,
+    marginVertical: 30,
     backgroundColor: '#f0f0f0',
     padding: 15,
-    borderRadius: 10,
+    borderRadius: 50,
     alignItems: 'center',
     width: '90%',
   },
@@ -91,12 +91,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   image: {
-    width: 150,
-    height: 150,
+    width: 250,
+    height: 250,
     marginVertical: 5,
   },
   inputContainer: {
-    width: '90%',
+    width: '100%',
     marginVertical: 10,
   },
   label: {

@@ -4,7 +4,7 @@ import {
   Text, 
   View, 
   TouchableOpacity, 
-  Image, 
+  Image,
   ScrollView,
   SafeAreaView,
   Dimensions,
@@ -12,199 +12,189 @@ import {
   Animated,
   Easing,
   Modal,
-  Alert
+  Alert,
+  TextInput,
+  Keyboard
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { Camera } from 'expo-camera';
-//\\import { Camera } from 'expo-camera';
-import * as Linking from 'expo-linking';
+import RachaImage from '../../assets/Racha.png'; 
 const { width } = Dimensions.get('window');
-import { BarCodeScanner } from 'expo-barcode-scanner';
+
+// Función para hashear códigos (simulación simple - en producción usar una librería de hashing real)
+const hashCode = (code) => {
+  let hash = 0;
+  for (let i = 0; i < code.length; i++) {
+    const char = code.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; 
+  }
+  return Math.abs(hash).toString();
+};
+
+// Validar formato de código
+const validateCodeFormat = (code) => {
+  // Código debe tener entre 6-12 caracteres alfanuméricos
+  const codeRegex = /^[A-Z0-9]{6,12}$/;
+  return codeRegex.test(code);
+};
+
+// Generar código seguro aleatorio
+const generateSecureCode = () => {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let result = '';
+  for (let i = 0; i < 8; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+};
 
 export default function App({ navigation }) {
   const [selectedCourse, setSelectedCourse] = useState(null);
-  const [completedCourses, setCompletedCourses] = useState(1); // Inicialmente 1 (como en el estado original)
-  const [hasPermission, setHasPermission] = useState(null);
-  const [scanned, setScanned] = useState(false);
-  const [showScanner, setShowScanner] = useState(false);
+  const [completedCourses, setCompletedCourses] = useState(1);
+  const [showCodeInput, setShowCodeInput] = useState(false);
+  const [manualCode, setManualCode] = useState('');
+  const [showCompletionCode, setShowCompletionCode] = useState(null);
+  const [isValidating, setIsValidating] = useState(false);
+  const [attemptCount, setAttemptCount] = useState(0);
+  const [isBlocked, setIsBlocked] = useState(false);
+  const [blockTimeLeft, setBlockTimeLeft] = useState(0);
 
-  // Solicitar permisos de cámara cuando se necesite
-  const requestCameraPermission = async () => {
-  try {
-    const { status } = await BarCodeScanner.requestPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert(
-        "Permiso requerido",
-        "Necesitamos acceso a la cámara para escanear códigos QR",
-        [
-          {
-            text: "Abrir Configuración",
-            onPress: () => Linking.openSettings()
-          },
-          {
-            text: "Cancelar",
-            style: "cancel"
-          }
-        ]
-      );
-      return false;
+  const textInputRef = useRef(null);
+  const blockTimerRef = useRef(null);
+
+  // Datos de cursos con códigos hasheados y sistema de seguridad mejorado
+  const [coursesList, setCoursesList] = useState([]);
+
+useEffect(() => {
+  fetch('http://192.168.100.87:3000/api/cursos') // reemplaza TU_IP_LOCAL
+    .then(res => res.json())
+    .then(data => {
+      const formatted = data.map(curso => ({
+        id: curso.id,
+        title: curso.titulo,
+        icon: "📘",
+        color: "#1a397c",
+        codeHash: curso.hash_codigo,
+        completed: false,
+        details: {
+          description: curso.descripcion,
+          modality: curso.modalidad,
+          duration: curso.duracion,
+          location: curso.sede,
+          callToAction: "Información del curso",
+          schedule: `${curso.hora_inicio} - ${curso.hora_fin}`,
+          requirements: curso.requisitos
+        }
+      }));
+      setCoursesList(formatted);
+    })
+    .catch(err => {
+      console.error('Error cargando cursos:', err);
+    });
+}, []);
+
+
+  // Timer para el bloqueo temporal
+  useEffect(() => {
+    if (isBlocked && blockTimeLeft > 0) {
+      blockTimerRef.current = setTimeout(() => {
+        setBlockTimeLeft(blockTimeLeft - 1);
+      }, 1000);
+    } else if (blockTimeLeft === 0 && isBlocked) {
+      setIsBlocked(false);
+      setAttemptCount(0);
     }
-    setHasPermission(true);
-    setShowScanner(true);
-    return true;
-  } catch (err) {
-    console.error("Error al solicitar permisos:", err);
-    Alert.alert("Error", "No se pudo acceder a la cámara");
-    return false;
+
+    return () => {
+      if (blockTimerRef.current) {
+        clearTimeout(blockTimerRef.current);
+      }
+    };
+  }, [isBlocked, blockTimeLeft]);
+
+  // Validación mejorada de códigos con sistema de intentos
+const verifyManualCode = async () => {
+  if (isBlocked) {
+    Alert.alert("Acceso Bloqueado", `Esperá ${blockTimeLeft} segundos antes de intentar nuevamente.`);
+    return;
   }
+
+  if (!manualCode.trim()) {
+    Alert.alert("Error", "Por favor ingresa el código de finalización");
+    return;
+  }
+
+  if (!validateCodeFormat(manualCode.trim())) {
+    Alert.alert("Formato Incorrecto", "El código debe tener entre 6-12 caracteres alfanuméricos");
+    return;
+  }
+
+  setIsValidating(true);
+
+  try {
+    const res = await fetch("http://192.168.100.87:3000/api/cursos/validar", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ codigo: manualCode.trim() })
+    });
+
+    const data = await res.json();
+
+    if (res.ok && data.valid) {
+      // Marca como completado en el frontend
+      const updatedCourses = [...coursesList];
+      const courseIndex = updatedCourses.findIndex(c => c.title === data.curso.titulo);
+
+      if (courseIndex !== -1 && !updatedCourses[courseIndex].completed) {
+        updatedCourses[courseIndex].completed = true;
+        updatedCourses[courseIndex].completionCode = generateSecureCode();
+        setCoursesList(updatedCourses);
+        setCompletedCourses(prev => prev + 1);
+        setAttemptCount(0);
+
+        setShowCompletionCode({
+          type: 'image',
+          image: RachaImage,
+          title: `¡Felicidades! Has completado el curso "${updatedCourses[courseIndex].title}"`
+        });
+      } else {
+        Alert.alert("Curso ya completado", `El curso "${data.curso.titulo}" ya ha sido completado.`);
+      }
+
+    } else {
+      throw new Error(data.message || "Código inválido");
+    }
+
+  } catch (err) {
+    const newAttemptCount = attemptCount + 1;
+    setAttemptCount(newAttemptCount);
+
+    if (newAttemptCount >= 3) {
+      setIsBlocked(true);
+      setBlockTimeLeft(30);
+      Alert.alert("Demasiados Intentos", "Has superado el número máximo de intentos. Bloqueado por 30 segundos.");
+    } else {
+      Alert.alert("Código incorrecto", `${err.message}. Intentos restantes: ${3 - newAttemptCount}`);
+    }
+  }
+
+  setManualCode('');
+  setShowCodeInput(false);
+  setIsValidating(false);
 };
 
 
-  // Datos completos de los cursos
-  const courses = [
-    {
-      id: 1,
-      title: "Animales Peligrosos",
-      icon: "🕷️",
-      color: "#1a397c",
-      qrCode: "curso-animales-peligrosos-2025",
-      completed: true, // Este ya está completado (valor inicial de completedCourses es 1)
-      details: {
-        description: "Aprende a identificar, prevenir y actuar ante encuentros con animales venenosos o agresivos. Incluye técnicas de primeros auxilios y protocolos de seguridad.",
-        modality: "PRESENCIAL",
-        duration: "4 HORAS",
-        location: "SEDE: GUADALAJARA",
-        callToAction: "Información del curso",
-        schedule: "Sábados 9:00 - 13:00",
-        requirements: "Ropa cómoda y cuaderno de notas"
-      }
-    },
-    { 
-      id: 2, 
-      title: "Supervivencia en Naturaleza", 
-      icon: "🦊", 
-      color: "#1a397c",
-      qrCode: "curso-supervivencia-naturaleza-2025",
-      completed: false,
-      details: {
-        description: "Técnicas esenciales de supervivencia en entornos naturales. Aprenderás a conseguir agua, hacer fuego, construir refugios y orientarte sin equipamiento.",
-        modality: "HÍBRIDO",
-        duration: "6 HORAS",
-        location: "SEDE: CDMX / ONLINE",
-        callToAction: "Información del curso",
-        schedule: "Viernes 16:00 - 20:00",
-        requirements: "Ninguno"
-      }
-    },
-    { 
-      id: 3, 
-      title: "Primeros Auxilios Avanzados", 
-      icon: "🦁", 
-      color: "#1a397c",
-      qrCode: "curso-primeros-auxilios-avanzados-2025",
-      completed: false,
-      details: {
-        description: "Curso avanzado de primeros auxilios para situaciones críticas. Incluye RCP, manejo de hemorragias y atención a traumatismos.",
-        modality: "PRESENCIAL",
-        duration: "8 HORAS",
-        location: "SEDE: MONTERREY",
-        callToAction: "Información del curso",
-        schedule: "Domingos 10:00 - 18:00",
-        requirements: "Certificado básico de primeros auxilios"
-      }
-    },
-    { 
-      id: 4, 
-      title: "Manejo de Crisis", 
-      icon: "🐊", 
-      color: "#1a397c",
-      qrCode: "curso-manejo-crisis-2025",
-      completed: false,
-      details: {
-        description: "Desarrolla habilidades para manejar situaciones de crisis y emergencias. Trabajo en equipo, toma de decisiones bajo presión y comunicación efectiva.",
-        modality: "VIRTUAL",
-        duration: "3 HORAS",
-        location: "PLATAFORMA: ZOOM",
-        callToAction: "Información del curso",
-        schedule: "Miércoles 18:00 - 21:00",
-        requirements: "Conexión a internet estable"
-      }
-    },
-    { 
-      id: 5, 
-      title: "Rastreo y Seguimiento", 
-      icon: "🐘", 
-      color: "#1a397c",
-      qrCode: "curso-rastreo-seguimiento-2025",
-      completed: false,
-      details: {
-        description: "Aprende técnicas profesionales de rastreo y seguimiento en diferentes terrenos. Ideal para rescatistas y equipos de búsqueda.",
-        modality: "PRESENCIAL",
-        duration: "5 HORAS",
-        location: "SEDE: GUADALAJARA",
-        callToAction: "Información del curso",
-        schedule: "Jueves 14:00 - 19:00",
-        requirements: "Botas para campo"
-      }
-    },
-    { 
-      id: 6, 
-      title: "Defensa Personal", 
-      icon: "🦅", 
-      color: "#1a397c",
-      qrCode: "curso-defensa-personal-2025",
-      completed: false,
-      details: {
-        description: "Técnicas básicas y avanzadas de defensa personal adaptadas a diferentes contextos y situaciones de peligro.",
-        modality: "PRESENCIAL",
-        duration: "4 HORAS",
-        location: "SEDE: CDMX",
-        callToAction: "Información del curso",
-        schedule: "Martes y Jueves 17:00 - 19:00",
-        requirements: "Ropa deportiva"
-      }
-    },
-  ];
-
-  // Estado mutable de los cursos
-  const [coursesList, setCoursesList] = useState(courses);
-
-  const handleBarCodeScanned = ({ type, data }) => {
-    setScanned(true);
-    
-    // Buscar el curso correspondiente al código QR escaneado
-    const courseIndex = coursesList.findIndex(course => course.qrCode === data);
-    
-    if (courseIndex !== -1) {
-      const updatedCourses = [...coursesList];
-      
-      // Verificar si el curso ya estaba completado
-      if (!updatedCourses[courseIndex].completed) {
-        updatedCourses[courseIndex].completed = true;
-        setCoursesList(updatedCourses);
-        setCompletedCourses(prev => prev + 1);
-        
-        Alert.alert(
-          "¡Curso Completado!", 
-          `¡Felicidades! Has completado el curso "${updatedCourses[courseIndex].title}".`,
-          [{ text: "OK", onPress: () => setShowScanner(false) }]
-        );
-      } else {
-        Alert.alert(
-          "Curso ya completado", 
-          `El curso "${updatedCourses[courseIndex].title}" ya ha sido marcado como completado anteriormente.`,
-          [{ text: "OK", onPress: () => setShowScanner(false) }]
-        );
-      }
-    } else {
-      // Código QR no válido o no reconocido
-      Alert.alert(
-        "Código QR inválido", 
-        "Este código QR no corresponde a ningún curso registrado.",
-        [{ text: "Intentar de nuevo", onPress: () => setScanned(false) }]
-      );
+  const showCodeInputModal = () => {
+    if (isBlocked) {
+      Alert.alert("Acceso Bloqueado", `Esperá ${blockTimeLeft} segundos antes de intentar nuevamente.`);
+      return;
     }
+    
+    setShowCodeInput(true);
+    setSelectedCourse(null);
   };
 
   const FlipCard = ({ course }) => {
@@ -222,12 +212,22 @@ export default function App({ navigation }) {
     });
   
     const flipCard = () => {
-      Animated.timing(animatedValue, {
-        toValue: flipped ? 0 : 180,
-        duration: 500,
-        easing: Easing.linear,
-        useNativeDriver: true
-      }).start(() => setFlipped(!flipped));
+      if (flipped) {
+        Animated.spring(animatedValue, {
+          toValue: 0,
+          friction: 8,
+          tension: 10,
+          useNativeDriver: true,
+        }).start();
+      } else {
+        Animated.spring(animatedValue, {
+          toValue: 180,
+          friction: 8,
+          tension: 10,
+          useNativeDriver: true,
+        }).start();
+      }
+      setFlipped(!flipped);
     };
 
     const showCourseDetails = () => {
@@ -348,16 +348,31 @@ export default function App({ navigation }) {
               </View>
               
               {!course.completed && (
-                <TouchableOpacity 
-                  style={[styles.scanQrButton, { backgroundColor: course.color }]}
-                  onPress={() => {
-                    requestCameraPermission();
-                    setShowScanner(true);
-                  }}
-                >
-                  <Ionicons name="qr-code-outline" size={20} color="white" />
-                  <Text style={styles.scanQrButtonText}>Escanear código QR para completar</Text>
-                </TouchableOpacity>
+                <View>
+                  <TouchableOpacity 
+                    style={[
+                      styles.scanQrButton, 
+                      { backgroundColor: isBlocked ? '#ccc' : course.color }
+                    ]}
+                    onPress={showCodeInputModal}
+                    disabled={isBlocked}
+                  >
+                    <Ionicons name="pencil-outline" size={20} color="white" />
+                    <Text style={styles.scanQrButtonText}>
+                      {isBlocked ? `Bloqueado (${blockTimeLeft}s)` : 'Ingresar código de finalización'}
+                    </Text>
+                  </TouchableOpacity>
+                  
+                  <Text style={styles.codeHintText}>
+                    El instructor te proporcionará un código al finalizar el curso
+                  </Text>
+                  
+                  {attemptCount > 0 && (
+                    <Text style={styles.warningText}>
+                      Intentos restantes: {3 - attemptCount}
+                    </Text>
+                  )}
+                </View>
               )}
               
               {course.completed && (
@@ -366,6 +381,12 @@ export default function App({ navigation }) {
                   <Text style={styles.completedCourseText}>
                     Este curso ha sido completado exitosamente
                   </Text>
+                  <TouchableOpacity 
+                    style={styles.showCodeButton}
+                    onPress={() => setShowCompletionCode(course.completionCode || 'COMPLETED')}
+                  >
+                    <Text style={styles.showCodeButtonText}>Ver código de completado</Text>
+                  </TouchableOpacity>
                 </View>
               )}
             </ScrollView>
@@ -382,58 +403,178 @@ export default function App({ navigation }) {
     );
   };
 
-  const QRScannerModal = () => {
+  const CodeInputModal = () => {
+    const [localCode, setLocalCode] = useState(manualCode);
+    
+    useEffect(() => {
+      if (showCodeInput) {
+        const timer = setTimeout(() => {
+          textInputRef.current?.focus();
+        }, 100);
+        return () => clearTimeout(timer);
+      }
+    }, [showCodeInput]);
+
+    const handleCodeChange = (text) => {
+      const cleanText = text.toUpperCase().replace(/[^A-Z0-9]/g, '').substring(0, 12);
+      setLocalCode(cleanText);
+    };
+
+    const handleSubmit = () => {
+      setManualCode(localCode);
+      verifyManualCode();
+    };
+
+    if (!showCodeInput) return null;
+
     return (
       <Modal
         animationType="slide"
         transparent={true}
-        visible={showScanner}
+        visible={showCodeInput}
         onRequestClose={() => {
-          setShowScanner(false);
-          setScanned(false);
+          setShowCodeInput(false);
+          setManualCode('');
         }}
       >
-        <View style={styles.qrScannerContainer}>
-          <View style={styles.qrScannerContent}>
-            <View style={styles.qrScannerHeader}>
-              <Text style={styles.qrScannerTitle}>Escanea el código QR del curso</Text>
+        <TouchableOpacity 
+          style={styles.modalContainer}
+          activeOpacity={1}
+          onPress={Keyboard.dismiss}
+        >
+          <View style={styles.modalContent}>
+            <View style={[styles.modalHeader, { backgroundColor: '#1a397c' }]}>
+              <Text style={styles.modalTitle}>Código de Finalización</Text>
+              <Text style={styles.modalSubtitle}>
+                Ingresa el código proporcionado por tu instructor
+              </Text>
+              {isBlocked && (
+                <Text style={styles.blockWarning}>
+                  Acceso bloqueado por {blockTimeLeft} segundos
+                </Text>
+              )}
             </View>
-            
-            <View style={styles.scannerContainer}>
-              {hasPermission === null ? (
-                <Text style={styles.permissionText}>Solicitando permiso de cámara...</Text>
-              ) : hasPermission === false ? (
-                  <Text style={styles.permissionText}>Sin acceso a la cámara</Text>
-                ) : (
-                  <BarCodeScanner
-                    onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
-                    style={styles.scanner}
-                  />
 
-              )}
-              
-              <View style={styles.scannerOverlay}>
-                <View style={styles.scannerMarker} />
+            <View style={styles.modalBody}>
+              <Text style={styles.modalDescription}>
+                Al finalizar el curso, el instructor te dará un código de 6-12 caracteres para validar tu asistencia.
+              </Text>
+
+              <View style={styles.codeInputContainer}>
+                <TextInput
+                  ref={textInputRef}
+                  style={[
+                    styles.codeInput,
+                    isBlocked && styles.codeInputDisabled
+                  ]}
+                  placeholder="Ej: 20AS7Q"
+                  value={localCode}
+                  onChangeText={handleCodeChange}
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  placeholderTextColor="#999"
+                  keyboardType="default"
+                  returnKeyType="done"
+                  onSubmitEditing={handleSubmit}
+                  editable={!isBlocked && !isValidating}
+                  maxLength={12}
+                  selectTextOnFocus={true}
+                />
+                <Text style={styles.characterCount}>
+                  {localCode.length}/12 caracteres
+                </Text>
               </View>
-              
-              {scanned && (
-                <TouchableOpacity 
-                  style={styles.scanAgainButton}
-                  onPress={() => setScanned(false)}
-                >
-                  <Text style={styles.scanAgainButtonText}>Escanear de nuevo</Text>
-                </TouchableOpacity>
+
+              {attemptCount > 0 && !isBlocked && (
+                <Text style={styles.warningText}>
+                  ⚠️ Intentos restantes: {3 - attemptCount}
+                </Text>
               )}
+
+              <View style={styles.codeInputButtons}>
+                <TouchableOpacity 
+                  style={[styles.codeInputButton, { backgroundColor: '#ccc' }]}
+                  onPress={() => {
+                    setLocalCode('');
+                    setShowCodeInput(false);
+                    Keyboard.dismiss();
+                  }}
+                  disabled={isValidating}
+                >
+                  <Text style={styles.codeInputButtonText}>Cancelar</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={[
+                    styles.codeInputButton, 
+                    { 
+                      backgroundColor: isBlocked || isValidating || !localCode.trim() 
+                        ? '#ccc' 
+                        : '#1a397c' 
+                    }
+                  ]}
+                  onPress={handleSubmit}
+                  disabled={isBlocked || isValidating || !localCode.trim()}
+                >
+                  <Text style={[
+                    styles.codeInputButtonText, 
+                    { color: isBlocked || isValidating || !localCode.trim() ? '#666' : 'white' }
+                  ]}>
+                    {isValidating ? 'Validando...' : 'Validar'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
-            
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    );
+  };
+
+  const CompletionCodeModal = () => {
+    if (!showCompletionCode) return null;
+
+    return (
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={!!showCompletionCode}
+        onRequestClose={() => setShowCompletionCode(null)}
+      >
+        <View style={styles.codeDisplayContainer}>
+          <View style={styles.codeDisplayContent}>
+            {showCompletionCode.type === 'image' ? (
+              <>
+                <Image 
+                  source={showCompletionCode.image} 
+                  style={styles.completionImage}
+                  resizeMode="contain"
+                />
+                <Text style={styles.codeDisplayTitle}>
+                  {showCompletionCode.title}
+                </Text>
+                <Text style={styles.codeDisplayText}>
+                  Sigue así y no pierdas tu racha
+                </Text>
+              </>
+            ) : (
+              <>
+                <Ionicons name="shield-checkmark" size={50} color="#2ecc71" />
+                <Text style={styles.codeDisplayTitle}>Código de Completado</Text>
+                <View style={styles.codeDisplayCodeContainer}>
+                  <Text style={styles.codeDisplayCode}>{showCompletionCode.code}</Text>
+                </View>
+                <Text style={styles.codeDisplayText}>
+                  Este código confirma que has completado el curso exitosamente.
+                  Guárdalo como comprobante de finalización.
+                </Text>
+              </>
+            )}
             <TouchableOpacity 
-              style={styles.cancelScanButton}
-              onPress={() => {
-                setShowScanner(false);
-                setScanned(false);
-              }}
+              style={styles.codeDisplayButton}
+              onPress={() => setShowCompletionCode(null)}
             >
-              <Text style={styles.cancelScanButtonText}>Cancelar</Text>
+              <Text style={styles.codeDisplayButtonText}>Cerrar</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -492,7 +633,8 @@ export default function App({ navigation }) {
       <View style={styles.mascotContainer}>
         <Image 
           source={{ uri: 'https://vignette.wikia.nocookie.net/doblaje/images/f/f2/Alexleon.png/revision/latest?cb=20141225032252&path-prefix=es' }} 
-          style={styles.mascotImage} 
+          style={styles.mascotImage}
+          resizeMode="contain"
         />
         <View style={styles.speechBubble}>
           <Text style={styles.speechBubbleText}>
@@ -519,7 +661,8 @@ export default function App({ navigation }) {
         onClose={() => setSelectedCourse(null)} 
       />
       
-      <QRScannerModal />
+      <CodeInputModal />
+      <CompletionCodeModal />
     </SafeAreaView>
   );
 }
@@ -577,9 +720,10 @@ const styles = StyleSheet.create({
   },
   mascotContainer: {
     flexDirection: 'row',
-    paddingHorizontal: 15,
-    marginBottom: 20,
-    alignItems: 'center',
+    paddingHorizontal: 20,
+    marginBottom: 15,
+    alignItems: 'flex-start',
+    marginTop: 10,
   },
   mascotImage: {
     width: 80,
@@ -590,8 +734,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f0f0f0',
     borderRadius: 15,
-    padding: 10,
+    padding: 15,
     marginLeft: 10,
+    marginTop: 10,
   },
   speechBubbleText: {
     color: '#1a397c',
@@ -600,26 +745,28 @@ const styles = StyleSheet.create({
   },
   cardsContainer: {
     flex: 1,
-    paddingHorizontal: 15,
+    paddingHorizontal: 5,
   },
   cardsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    justifyContent: 'space-around',
+    padding: 10,
     paddingBottom: 20,
   },
   card: {
-    width: (width - 30) / 2,
-    height: (width - 30) / 2,
+    width: (width - 40) / 1,
+    height: (width - 40) * 0.65,
     borderRadius: 20,
-    marginBottom: 35,
+    marginBottom: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-    borderWidth: 1,
+    shadowRadius: 8,
+    elevation: 6,
+    borderWidth: 2,
     borderColor: '#e0e0e0',
+    overflow: 'hidden',
   },
   highlightedCard: {
     borderColor: '#1a397c',
@@ -699,7 +846,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   detailCardDescription: {
-    fontSize: 10,
+    fontSize: 20,
     lineHeight: 16,
     color: '#333',
     marginBottom: 15,
@@ -726,7 +873,7 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     width: '90%',
-    maxHeight: '80%',
+    maxHeight: '85%',
     backgroundColor: 'white',
     borderRadius: 15,
     overflow: 'hidden',
@@ -802,8 +949,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 16,
   },
-
-    scanQrButton: {
+  scanQrButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -817,7 +963,7 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   completedCourseInfo: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     alignItems: 'center',
     backgroundColor: 'rgba(0, 200, 0, 0.1)',
     padding: 15,
@@ -826,113 +972,128 @@ const styles = StyleSheet.create({
   },
   completedCourseText: {
     color: 'green',
-    marginLeft: 10,
+    marginTop: 10,
     fontSize: 16,
-    flex: 1,
+    textAlign: 'center',
   },
-  qrScannerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+  codeHintText: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 10,
+    fontStyle: 'italic',
   },
-  qrScannerContent: {
-    width: '90%',
-    height: '80%',
-    backgroundColor: 'white',
-    borderRadius: 15,
-    overflow: 'hidden',
-    display: 'flex',
-    flexDirection: 'column',
+  warningText: {
+    fontSize: 12,
+    color: '#e74c3c',
+    textAlign: 'center',
+    marginTop: 10,
   },
-  qrScannerHeader: {
-    padding: 15,
-    alignItems: 'center',
-    backgroundColor: '#1a397c',
-  },
-  qrScannerTitle: {
-    fontSize: 18,
+  blockWarning: {
+    fontSize: 12,
+    color: '#fff',
+    textAlign: 'center',
+    marginTop: 5,
     fontWeight: 'bold',
-    color: 'white',
   },
-  scannerContainer: {
-    flex: 1,
-    position: 'relative',
+  codeInputContainer: {
+    marginTop: 20,
+    marginBottom: 10,
   },
-  scanner: {
-    flex: 1,
-  },
-  scannerOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  scannerMarker: {
-    width: 200,
-    height: 200,
+  codeInput: {
     borderWidth: 2,
-    borderColor: 'white',
-    backgroundColor: 'transparent',
+    borderColor: '#1a397c',
+    borderRadius: 10,
+    padding: 15,
+    fontSize: 18,
+    textAlign: 'center',
+    fontWeight: 'bold',
+    color: '#1a397c',
+    backgroundColor: '#f8f9fa',
   },
-  scanAgainButton: {
-    position: 'absolute',
-    bottom: 20,
-    alignSelf: 'center',
-    backgroundColor: '#1a397c',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+  codeInputDisabled: {
+    backgroundColor: '#eee',
+    color: '#999',
+  },
+  codeInputButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 20,
+  },
+  codeInputButton: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginHorizontal: 5,
+  },
+  codeInputButtonText: {
+    fontWeight: 'bold',
+  },
+  characterCount: {
+    textAlign: 'right',
+    fontSize: 12,
+    color: '#666',
+    marginTop: 5,
+  },
+  showCodeButton: {
+    marginTop: 15,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#1a397c',
     borderRadius: 8,
   },
-  scanAgainButtonText: {
-    color: 'white',
+  showCodeButtonText: {
+    color: '#1a397c',
     fontWeight: 'bold',
   },
-  cancelScanButton: {
-    padding: 15,
+  codeDisplayContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#ff6348',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
   },
-  cancelScanButtonText: {
+  codeDisplayContent: {
+    backgroundColor: 'white',
+    padding: 25,
+    borderRadius: 15,
+    width: '80%',
+    alignItems: 'center',
+  },
+  
+  codeDisplayTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 15,
+    color: '#1a397c',
+  },
+  codeDisplayCode: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 20,
+    color: '#2ecc71',
+  },
+  codeDisplayText: {
+    fontSize: 14,
+    color: '#555',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  codeDisplayButton: {
+    padding: 12,
+    backgroundColor: '#1a397c',
+    borderRadius: 8,
+    width: '100%',
+    alignItems: 'center',
+  },
+  codeDisplayButtonText: {
     color: 'white',
     fontWeight: 'bold',
-    fontSize: 16,
-  },
-  permissionText: {
-    textAlign: 'center',
-    padding: 20,
-    color: '#555',
   },
 
-  permissionContainer: {
-  flex: 1,
-  justifyContent: 'center',
-  alignItems: 'center',
-  backgroundColor: '#fff',
-},
-scannerOverlay: {
-  flex: 1,
-  justifyContent: 'center',
-  alignItems: 'center',
-  backgroundColor: 'transparent',
-},
-scannerMarker: {
-  width: 250,
-  height: 250,
-  borderWidth: 2,
-  borderColor: 'white',
-  backgroundColor: 'transparent',
-},
-closeButton: {
-  position: 'absolute',
-  top: 40,
-  right: 20,
-  backgroundColor: 'rgba(0,0,0,0.5)',
-  borderRadius: 20,
-  padding: 10,
-},
+  completionImage: {
+    width: 250,
+    height: 250,
+    marginBottom: 20,
+  },
 });
-
