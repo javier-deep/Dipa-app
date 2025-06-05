@@ -5,49 +5,40 @@ import { Image as ExpoImage } from 'expo-image';
 export default function Avatar({ navigation }) {
   const [selectedAccessories, setSelectedAccessories] = useState([]);
 
+  // Accesorios con posiciones ajustadas para que encajen mejor
   const accessories = [
     { 
       id: 1, 
       name: 'Gafas de sol', 
       image: require('../../assets/gafas.png'),
-      position: { top: 50, left: 60, width: 120, height: 60 } 
+      position: { top: '30%', left: '15%', width: '55%', height: '10%' } 
     },
     { 
       id: 2, 
       name: 'Cuaderno DIA', 
       image: require('../../assets/cuaderno.png'),
-      position: { top: 150, left: 40, width: 80, height: 100 }
-    },
-    
-      
-    { 
-      id: 4, 
-      name: 'Botiquín', 
-      image: require('../../assets/botiquin.png'),
-      position: { top: 180, left: 70, width: 90, height: 90 }
+      position: { top: '60%', left: '10%', width: '30%', height: '40%' }
     },
     { 
       id: 5, 
       name: 'Gorra azul', 
       image: require('../../assets/gorra.png'),
-      position: { top: 30, left: 55, width: 130, height: 70 }
+      position: { top: '15%', left: '10%', width: '70%', height: '20%' }
     },
   ];
 
   const toggleAccessory = (id) => {
     if (selectedAccessories.includes(id)) {
       setSelectedAccessories(selectedAccessories.filter((acc) => acc !== id));
-    } else if (selectedAccessories.length < 2) {
+    } else if (selectedAccessories.length < 1) { // Permitir hasta 2 accesorios
       setSelectedAccessories([...selectedAccessories, id]);
     } else {
-      alert('Solo puedes seleccionar 2 accesorios.');
+      alert('Solo puedes seleccionar 1 accesorio.');
     }
   };
 
   return (
     <View style={styles.container}>
-      {/* Título */}
-
       {/* Barra de progreso */}
       <View style={styles.progressBarContainer}>
         <View style={[styles.progressBar, { width: '80%' }]} />
@@ -64,7 +55,7 @@ export default function Avatar({ navigation }) {
       <View style={styles.lionSection}>
         <View style={styles.lionContainer}>
           <ExpoImage 
-            source={require('../../assets/alex.png')} 
+            source={require('../../assets/avatar.gif')} 
             style={styles.lionImage}
             contentFit="contain"
           />
@@ -78,6 +69,7 @@ export default function Avatar({ navigation }) {
                 style={[
                   styles.accessoryImage,
                   {
+                    position: 'absolute',
                     top: accessory.position.top,
                     left: accessory.position.left,
                     width: accessory.position.width,
@@ -90,7 +82,7 @@ export default function Avatar({ navigation }) {
           })}
         </View>
 
-        {/* Accesorios en lista vertical */}
+        {/* Lista de accesorios */}
         <View style={styles.accessoryListVertical}>
           {accessories.map((accessory) => (
             <TouchableOpacity
@@ -106,6 +98,7 @@ export default function Avatar({ navigation }) {
                 style={styles.accessoryThumbnail}
                 contentFit="contain"
               />
+              <Text style={styles.accessoryName}>{accessory.name}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -113,8 +106,12 @@ export default function Avatar({ navigation }) {
 
       {/* Botón para continuar */}
       <TouchableOpacity
-        style={styles.continueButton}
+        style={[
+          styles.continueButton,
+          selectedAccessories.length === 0 && styles.disabledButton
+        ]}
         onPress={() => navigation.navigate('RegistroC')}
+        disabled={selectedAccessories.length === 0}
       >
         <Text style={styles.buttonText}>¡EMPECEMOS A RUGIR!</Text>
       </TouchableOpacity>
@@ -129,96 +126,99 @@ const styles = StyleSheet.create({
     paddingTop: 50,
     paddingHorizontal: 20,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1A237E',
-    textAlign: 'center',
-    marginBottom: 10,
-  },
   progressBarContainer: {
-    height: 30,
+    height: 10,
     width: '90%',
-    backgroundColor: '#ccc',
-    borderRadius: 70,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 5,
     alignSelf: 'center',
     overflow: 'hidden',
-    marginBottom: 10,
+    marginBottom: 20,
   },
   progressBar: {
     height: '100%',
     backgroundColor: '#1A237E',
-    borderRadius: 70,
+    borderRadius: 5,
   },
   speechBubble: {
-    backgroundColor: '#fff',
-    padding: 12,
+    backgroundColor: '#F5F5F5',
+    padding: 15,
     borderRadius: 20,
-    borderColor: '#aaa',
+    borderColor: '#E0E0E0',
     borderWidth: 1,
     alignSelf: 'center',
-    marginVertical: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 3,
+    marginVertical: 15,
+    maxWidth: '80%',
   },
   speechText: {
     textAlign: 'center',
     fontSize: 16,
     fontWeight: '600',
+    color: '#333',
   },
   lionSection: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
+    marginTop: 20,
   },
   lionContainer: {
-    width: 220,
-    height: 320,
+    width: 250,
+    height: 300,
     position: 'relative',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   lionImage: {
-    width: 250,
-    height: 250,
-  },
-  accessoryImage: {
-    position: 'absolute',
+    width: '120%',
+    height: '150%',
   },
   accessoryListVertical: {
-    marginLeft: 10,
-    height: 320,
+    marginLeft: 2,
+    height: 300,
     justifyContent: 'space-around',
   },
   accessoryItemVertical: {
-    backgroundColor: '#eee',
-    padding: 5,
-    borderRadius: 10,
-    marginVertical: 5,
+    backgroundColor: '#F5F5F5',
+    padding: 10,
+    borderRadius: 50,
+    marginVertical: 20,
+    alignItems: 'center',
+    width: 100,
   },
   selectedItem: {
     borderColor: '#1A237E',
-    borderWidth: 2,
+    borderWidth: 3,
+    backgroundColor: '#E3F2FD',
   },
   accessoryThumbnail: {
-    width: 60,
-    height: 60,
+    width: 50,
+    height: 50,
+    marginBottom: 5,
+  },
+  accessoryName: {
+    fontSize: 12,
+    textAlign: 'center',
+    color: '#333',
   },
   continueButton: {
-    backgroundColor: '#1A237E',
-    paddingVertical: 14,
-    borderRadius: 20,
-    marginTop: 200,
+    backgroundColor: '#0056b3',
+    paddingVertical: 15,
+    borderRadius: 55,
+    marginTop: 120,
     alignSelf: 'center',
     paddingHorizontal: 30,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 5,
+  },
+  disabledButton: {
+    backgroundColor: '#0056b3',
   },
   buttonText: {
     color: '#fff',
     fontWeight: 'bold',
-    fontSize: 15,
+    fontSize: 16,
     textTransform: 'uppercase',
   },
 });
