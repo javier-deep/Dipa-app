@@ -10,19 +10,7 @@ const compareTimes = (time1, time2) => {
   return s1 - s2;
 };
 
-// Función para obtener todos los cursos (NUEVA)
-const obtenerCursos = (req, res) => {
-  db.query('SELECT * FROM talleres', (err, results) => {
-    if (err) {
-      console.error('Error al obtener cursos:', err);
-      return res.status(500).json({ 
-        error: 'Error al obtener los cursos',
-        details: process.env.NODE_ENV === 'development' ? err.message : undefined
-      });
-    }
-    res.json(results);
-  });
-};
+
 
 // Función para validar código
 const validarCodigo = (req, res) => {
@@ -93,9 +81,55 @@ const validarCodigo = (req, res) => {
     }
   );
 };
+// Función para obtener todos los cursos (con filtro por sede)
+const obtenerCursos = (req, res) => {
+  const { sede } = req.query; // Obtener el parámetro de sede de la URL
+  
+  let query = 'SELECT t.*, s.nombre as nombre_sede FROM talleres t LEFT JOIN sedes s ON t.sede = s.id';
+  const params = [];
+  
+  if (sede && sede !== 'all') {
+    query += ' WHERE t.sede = ?';
+    params.push(sede);
+  }
 
-// Exportar ambas funciones
+  db.query(query, params, (err, results) => {
+    if (err) {
+      console.error('Error al obtener cursos:', err);
+      return res.status(500).json({ 
+        error: 'Error al obtener los cursos',
+        details: process.env.NODE_ENV === 'development' ? err.message : undefined
+      });
+    }
+    
+    // Mapear los resultados para incluir el nombre de la sede
+    const cursosConSede = results.map(curso => ({
+      ...curso,
+      sede_nombre: curso.nombre_sede || 'Sin sede asignada'
+    }));
+    
+    res.json(cursosConSede);
+  });
+};
+
+
+// Función para obtener todas las sedes
+const obtenerSedes = (req, res) => {
+  db.query('SELECT * FROM sedes WHERE status = "activo"', (err, results) => {
+    if (err) {
+      console.error('Error al obtener sedes:', err);
+      return res.status(500).json({ 
+        error: 'Error al obtener las sedes',
+        details: process.env.NODE_ENV === 'development' ? err.message : undefined
+      });
+    }
+    res.json(results);
+  });
+};
+
+// Actualiza el export al final del archivo
 module.exports = {
   obtenerCursos,
-  validarCodigo
+  validarCodigo,
+  obtenerSedes
 };

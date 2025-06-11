@@ -13,7 +13,7 @@ export default function Splash({ navigation }) {
         <View style={styles.container}>
 
             <Image
-                source={require('../../assets/splash.gif')}
+                source={require('../../assets/leon.gif')}
                 style={styles.image}
                 resizeMode="contain"
             />

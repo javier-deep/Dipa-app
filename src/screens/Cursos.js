@@ -59,6 +59,8 @@ export default function App({ navigation }) {
   const [attemptCount, setAttemptCount] = useState(0);
   const [isBlocked, setIsBlocked] = useState(false);
   const [blockTimeLeft, setBlockTimeLeft] = useState(0);
+  const [selectedSede, setSelectedSede] = useState('all');
+  const [sedes, setSedes] = useState([]);
 
   const textInputRef = useRef(null);
   const blockTimerRef = useRef(null);
@@ -66,34 +68,48 @@ export default function App({ navigation }) {
   // Datos de cursos con códigos hasheados y sistema de seguridad mejorado
   const [coursesList, setCoursesList] = useState([]);
 
-useEffect(() => {
-  fetch('http://192.168.100.87:3000/api/cursos') // reemplaza TU_IP_LOCAL
-    .then(res => res.json())
-    .then(data => {
-      const formatted = data.map(curso => ({
-        id: curso.id,
-        title: curso.titulo,
-        icon: "📘",
-        color: "#1a397c",
-        codeHash: curso.hash_codigo,
-        completed: false,
-        details: {
-          description: curso.descripcion,
-          modality: curso.modalidad,
-          duration: curso.duracion,
-          location: curso.sede,
-          callToAction: "Información del curso",
-          schedule: `${curso.hora_inicio} - ${curso.hora_fin}`,
-          requirements: curso.requisitos
-        }
-      }));
-      setCoursesList(formatted);
-    })
-    .catch(err => {
-      console.error('Error cargando cursos:', err);
-    });
-}, []);
+  useEffect(() => {
+    fetch(`http://192.168.100.95:3000/api/cursos${selectedSede !== 'all' ? `?sede=${selectedSede}` : ''}`)
+      .then(res => res.json())
+      .then(data => {
+        const formatted = data.map(curso => ({
+          id: curso.id,
+          title: curso.titulo,
+          icon: "📘",
+          color: "#1a397c",
+          codeHash: curso.hash_codigo,
+          completed: false,
+          details: {
+            description: curso.descripcion,
+            modality: curso.modalidad,
+            duration: curso.duracion,
+            location: curso.sede_nombre || `Sede ${curso.sede}`,
+            callToAction: "Información del curso",
+            schedule: `${curso.hora_inicio} - ${curso.hora_fin}`,
+            requirements: curso.requisitos
+          }
+        }));
+        setCoursesList(formatted);
+      })
+      .catch(err => {
+        console.error('Error cargando cursos:', err);
+      });
 
+
+    
+// Cargar sedes disponibles
+    fetch('http://192.168.100.95:3000/api/cursos/sedes')
+      .then(res => res.json())
+      .then(data => {
+        setSedes([
+          { id: 'all', name: 'Todas las sedes' },
+          ...data.map(sede => ({ id: sede.id, name: sede.nombre }))
+        ]);
+      })
+      .catch(err => {
+        console.error('Error cargando sedes:', err);
+      });
+  }, [selectedSede]);
 
   // Timer para el bloqueo temporal
   useEffect(() => {
@@ -113,89 +129,112 @@ useEffect(() => {
     };
   }, [isBlocked, blockTimeLeft]);
 
-  // Validación mejorada de códigos con sistema de intentos
-const verifyManualCode = async () => {
-  if (isBlocked) {
-    Alert.alert("Acceso Bloqueado", `Esperá ${blockTimeLeft} segundos antes de intentar nuevamente.`);
-    return;
-  }
-
-  if (!manualCode.trim()) {
-    Alert.alert("Error", "Por favor ingresa el código de finalización");
-    return;
-  }
-
-  if (!validateCodeFormat(manualCode.trim())) {
-    Alert.alert("Formato Incorrecto", "El código debe tener entre 6-12 caracteres alfanuméricos");
-    return;
-  }
-
-  setIsValidating(true);
-
-  try {
-    const res = await fetch("http://192.168.100.87:3000/api/cursos/validar", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ codigo: manualCode.trim() })
-    });
-
-    const data = await res.json();
-
-    if (res.ok && data.valid) {
-      // Marca como completado en el frontend
-      const updatedCourses = [...coursesList];
-      const courseIndex = updatedCourses.findIndex(c => c.title === data.curso.titulo);
-
-      if (courseIndex !== -1 && !updatedCourses[courseIndex].completed) {
-        updatedCourses[courseIndex].completed = true;
-        updatedCourses[courseIndex].completionCode = generateSecureCode();
-        setCoursesList(updatedCourses);
-        setCompletedCourses(prev => prev + 1);
-        setAttemptCount(0);
-
-        setShowCompletionCode({
-          type: 'image',
-          image: RachaImage,
-          title: `¡Felicidades! Has completado el curso "${updatedCourses[courseIndex].title}"`
-        });
-      } else {
-        Alert.alert("Curso ya completado", `El curso "${data.curso.titulo}" ya ha sido completado.`);
-      }
-
-    } else {
-      throw new Error(data.message || "Código inválido");
-    }
-
-  } catch (err) {
-    const newAttemptCount = attemptCount + 1;
-    setAttemptCount(newAttemptCount);
-
-    if (newAttemptCount >= 3) {
-      setIsBlocked(true);
-      setBlockTimeLeft(30);
-      Alert.alert("Demasiados Intentos", "Has superado el número máximo de intentos. Bloqueado por 30 segundos.");
-    } else {
-      Alert.alert("Código incorrecto", `${err.message}. Intentos restantes: ${3 - newAttemptCount}`);
-    }
-  }
-
-  setManualCode('');
-  setShowCodeInput(false);
-  setIsValidating(false);
-};
-
-
+  // FUNCIÓN FALTANTE - Mostrar modal de entrada de código
   const showCodeInputModal = () => {
+    setShowCodeInput(true);
+    setSelectedCourse(null); // Cerrar el modal de detalles
+  };
+
+  // Validación mejorada de códigos con sistema de intentos
+  const verifyManualCode = async () => {
     if (isBlocked) {
       Alert.alert("Acceso Bloqueado", `Esperá ${blockTimeLeft} segundos antes de intentar nuevamente.`);
       return;
     }
-    
-    setShowCodeInput(true);
-    setSelectedCourse(null);
+
+    if (!manualCode.trim()) {
+      Alert.alert("Error", "Por favor ingresa el código de finalización");
+      return;
+    }
+
+    if (!validateCodeFormat(manualCode.trim())) {
+      Alert.alert("Formato Incorrecto", "El código debe tener entre 6-12 caracteres alfanuméricos");
+      return;
+    }
+
+    setIsValidating(true);
+
+    try {
+      const res = await fetch("http://192.168.100.95:3000/api/cursos/validar", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ codigo: manualCode.trim() })
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.valid) {
+        // Marca como completado en el frontend
+        const updatedCourses = [...coursesList];
+        const courseIndex = updatedCourses.findIndex(c => c.title === data.curso.titulo);
+
+        if (courseIndex !== -1 && !updatedCourses[courseIndex].completed) {
+          updatedCourses[courseIndex].completed = true;
+          updatedCourses[courseIndex].completionCode = generateSecureCode();
+          setCoursesList(updatedCourses);
+          setCompletedCourses(prev => prev + 1);
+          setAttemptCount(0);
+
+          setShowCompletionCode({
+            type: 'image',
+            image: RachaImage,
+            title: `¡Felicidades! Has completado el curso "${updatedCourses[courseIndex].title}"`
+          });
+        } else {
+          Alert.alert("Curso ya completado", `El curso "${data.curso.titulo}" ya ha sido completado.`);
+        }
+
+      } else {
+        throw new Error(data.message || "Código inválido");
+      }
+    } catch (err) {
+      const newAttemptCount = attemptCount + 1;
+      setAttemptCount(newAttemptCount);
+
+      if (newAttemptCount >= 3) {
+        setIsBlocked(true);
+        setBlockTimeLeft(30);
+        Alert.alert("Demasiados Intentos", "Has superado el número máximo de intentos. Bloqueado por 30 segundos.");
+      } else {
+        Alert.alert("Código incorrecto", `${err.message}. Intentos restantes: ${3 - newAttemptCount}`);
+      }
+    }
+
+    setManualCode('');
+    setShowCodeInput(false);
+    setIsValidating(false);
   };
+
+  const SedeSelector = () => (
+    <View style={styles.sedeSelectorContainer}>
+      <Text style={styles.sedeSelectorLabel}>Filtrar por sede:</Text>
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.sedeSelector}
+      >
+        {sedes.map(sede => (
+          <TouchableOpacity
+            key={sede.id}
+            style={[
+              styles.sedeOption,
+              selectedSede === sede.id && styles.sedeOptionSelected
+            ]}
+            onPress={() => setSelectedSede(sede.id)}
+          >
+            <Text style={[
+              styles.sedeOptionText,
+              selectedSede === sede.id && styles.sedeOptionTextSelected
+            ]}>
+              {sede.name}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    </View>
+  );
 
   const FlipCard = ({ course }) => {
     const animatedValue = useRef(new Animated.Value(0)).current;
@@ -352,7 +391,7 @@ const verifyManualCode = async () => {
                   <TouchableOpacity 
                     style={[
                       styles.scanQrButton, 
-                      { backgroundColor: isBlocked ? '#ccc' : course.color }
+                      { backgroundColor: isBlocked ? '#cccccc' : course.color }
                     ]}
                     onPress={showCodeInputModal}
                     disabled={isBlocked}
@@ -383,7 +422,10 @@ const verifyManualCode = async () => {
                   </Text>
                   <TouchableOpacity 
                     style={styles.showCodeButton}
-                    onPress={() => setShowCompletionCode(course.completionCode || 'COMPLETED')}
+                    onPress={() => setShowCompletionCode({
+                      type: 'code',
+                      code: course.completionCode || 'COMPLETED'
+                    })}
                   >
                     <Text style={styles.showCodeButtonText}>Ver código de completado</Text>
                   </TouchableOpacity>
@@ -493,7 +535,7 @@ const verifyManualCode = async () => {
 
               <View style={styles.codeInputButtons}>
                 <TouchableOpacity 
-                  style={[styles.codeInputButton, { backgroundColor: '#ccc' }]}
+                  style={[styles.codeInputButton, { backgroundColor: '#cccccc' }]}
                   onPress={() => {
                     setLocalCode('');
                     setShowCodeInput(false);
@@ -501,7 +543,7 @@ const verifyManualCode = async () => {
                   }}
                   disabled={isValidating}
                 >
-                  <Text style={styles.codeInputButtonText}>Cancelar</Text>
+                  <Text style={[styles.codeInputButtonText, { color: '#666' }]}>Cancelar</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity 
@@ -509,7 +551,7 @@ const verifyManualCode = async () => {
                     styles.codeInputButton, 
                     { 
                       backgroundColor: isBlocked || isValidating || !localCode.trim() 
-                        ? '#ccc' 
+                        ? '#cccccc' 
                         : '#1a397c' 
                     }
                   ]}
@@ -628,6 +670,7 @@ const verifyManualCode = async () => {
       
       <View style={styles.titleContainer}>
         <Text style={styles.title}>Cursos y Talleres</Text>
+        <SedeSelector />
       </View>
       
       <View style={styles.mascotContainer}>
@@ -640,7 +683,7 @@ const verifyManualCode = async () => {
           <Text style={styles.speechBubbleText}>
             "¡Ruge con conocimiento! {"\n"}
             Un león bien capacitado siempre {"\n"}
-            está un paso adelante.
+            está un paso adelante."
           </Text>
         </View>
       </View>
@@ -1096,4 +1139,39 @@ const styles = StyleSheet.create({
     height: 250,
     marginBottom: 20,
   },
+
+  sedeSelectorContainer: {
+    marginTop: 10,
+    marginBottom: 15,
+    width: '100%',
+  },
+  sedeSelectorLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 8,
+    marginLeft: 15,
+  },
+  sedeSelector: {
+    paddingHorizontal: 10,
+  },
+  sedeOption: {
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#1a397c',
+    marginRight: 10,
+    backgroundColor: 'white',
+  },
+  sedeOptionSelected: {
+    backgroundColor: '#1a397c',
+  },
+  sedeOptionText: {
+    color: '#1a397c',
+    fontSize: 14,
+  },
+  sedeOptionTextSelected: {
+    color: 'white',
+  },
+
 });
