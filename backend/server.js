@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
@@ -12,9 +13,11 @@ app.use(express.json({ limit: '10mb' })); // Aumentar límite para imágenes bas
 // Rutas
 const cursosRoutes = require('./routes/cursos');
 const bannersRoutes = require('./routes/banners'); // Nueva ruta
+const authRoutes = require('./routes/authRoutes'); // Nueva ruta de autenticación
 
 app.use('/api/cursos', cursosRoutes);
 app.use('/api/banners', bannersRoutes); // Registrar rutas de banners
+app.use('/api/auth', authRoutes); // Registrar rutas de autenticación
 
 // Puerto
 const PORT = process.env.PORT || 3000;
