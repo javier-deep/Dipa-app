@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function Avatar({ navigation }) {
   const [selectedAccessories, setSelectedAccessories] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   // Accesorios con posiciones ajustadas para que encajen mejor
   const accessories = [
@@ -30,10 +32,69 @@ export default function Avatar({ navigation }) {
   const toggleAccessory = (id) => {
     if (selectedAccessories.includes(id)) {
       setSelectedAccessories(selectedAccessories.filter((acc) => acc !== id));
-    } else if (selectedAccessories.length < 1) { // Permitir hasta 2 accesorios
+    } else if (selectedAccessories.length < 1) { // Permitir solo 1 accesorio
       setSelectedAccessories([...selectedAccessories, id]);
     } else {
-      alert('Solo puedes seleccionar 1 accesorio.');
+      Alert.alert('Límite alcanzado', 'Solo puedes seleccionar 1 accesorio.');
+    }
+  };
+
+  const saveAvatarAndContinue = async () => {
+    if (selectedAccessories.length === 0) {
+      Alert.alert('Selección requerida', 'Por favor selecciona al menos un accesorio.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Obtener datos del usuario almacenados
+      const userDataString = await AsyncStorage.getItem('userData');
+      const userData = userDataString ? JSON.parse(userDataString) : null;
+
+      if (!userData || !userData.id) {
+        Alert.alert('Error', 'No se encontraron datos del usuario');
+        return;
+      }
+
+      // Crear objeto con la configuración del avatar
+      const avatarConfig = {
+        selectedAccessories,
+        avatarBase: 'leon', // Tipo de avatar base
+        lastUpdated: new Date().toISOString()
+      };
+
+      // Enviar al servidor
+      const response = await fetch('http://192.168.100.38:3000/api/auth/update-avatar', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: userData.id,
+          avatarConfig: JSON.stringify(avatarConfig)
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Error al guardar avatar');
+      }
+
+      // Actualizar datos locales del usuario
+      const updatedUserData = {
+        ...userData,
+        avatarConfig: avatarConfig
+      };
+      await AsyncStorage.setItem('userData', JSON.stringify(updatedUserData));
+
+      // Navegar a la siguiente pantalla
+      navigation.navigate('RegistroC');
+    } catch (error) {
+      console.error('Error al guardar avatar:', error);
+      Alert.alert('Error', 'No se pudo guardar el avatar. Intenta nuevamente.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -108,12 +169,14 @@ export default function Avatar({ navigation }) {
       <TouchableOpacity
         style={[
           styles.continueButton,
-          selectedAccessories.length === 0 && styles.disabledButton
+          (selectedAccessories.length === 0 || loading) && styles.disabledButton
         ]}
-        onPress={() => navigation.navigate('RegistroC')}
-        disabled={selectedAccessories.length === 0}
+        onPress={saveAvatarAndContinue}
+        disabled={selectedAccessories.length === 0 || loading}
       >
-        <Text style={styles.buttonText}>¡EMPECEMOS A RUGIR!</Text>
+        <Text style={styles.buttonText}>
+          {loading ? 'GUARDANDO...' : '¡EMPECEMOS A RUGIR!'}
+        </Text>
       </TouchableOpacity>
     </View>
   );
@@ -213,7 +276,7 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   disabledButton: {
-    backgroundColor: '#0056b3',
+    backgroundColor: '#cccccc',
   },
   buttonText: {
     color: '#fff',

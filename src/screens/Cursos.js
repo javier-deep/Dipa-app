@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react'; 
 import { 
   StyleSheet, 
   Text, 
@@ -20,9 +20,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 const { width } = Dimensions.get('window');
 import FlamaGif from '../../assets/flama.gif';
-//import { Image } from "expo-image";
-
-// Función para hashear códigos (simulación simple - en producción usar una librería de hashing real)
+//import { useAuth } from '../../context/AuthContext'; // Asegúrate de tener este contexto
+import { useAuth } from '../context/AuthContext';
+// Función para hashear códigos
 const hashCode = (code) => {
   let hash = 0;
   for (let i = 0; i < code.length; i++) {
@@ -35,7 +35,6 @@ const hashCode = (code) => {
 
 // Validar formato de código
 const validateCodeFormat = (code) => {
-  // Código debe tener entre 6-12 caracteres alfanuméricos
   const codeRegex = /^[A-Z0-9]{6,12}$/;
   return codeRegex.test(code);
 };
@@ -51,8 +50,9 @@ const generateSecureCode = () => {
 };
 
 export default function App({ navigation }) {
+  const { user } = useAuth(); // Obtener usuario autenticado
   const [selectedCourse, setSelectedCourse] = useState(null);
-  const [completedCourses, setCompletedCourses] = useState(1);
+  const [completedCourses, setCompletedCourses] = useState(0);
   const [showCodeInput, setShowCodeInput] = useState(false);
   const [manualCode, setManualCode] = useState('');
   const [showCompletionCode, setShowCompletionCode] = useState(null);
@@ -62,15 +62,23 @@ export default function App({ navigation }) {
   const [blockTimeLeft, setBlockTimeLeft] = useState(0);
   const [selectedSede, setSelectedSede] = useState('all');
   const [sedes, setSedes] = useState([]);
+  const [coursesList, setCoursesList] = useState([]);
+  const [completedCoursesList, setCompletedCoursesList] = useState([]);
 
   const textInputRef = useRef(null);
   const blockTimerRef = useRef(null);
 
-  // Datos de cursos con códigos hasheados y sistema de seguridad mejorado
-  const [coursesList, setCoursesList] = useState([]);
-
+  // Cargar cursos y sedes
   useEffect(() => {
-    fetch(`http://192.168.1.75:3000/api/cursos${selectedSede !== 'all' ? `?sede=${selectedSede}` : ''}`)
+    fetchCourses();
+    fetchSedes();
+    if (user?.id) {
+      loadCompletedCourses();
+    }
+  }, [selectedSede, user?.id]);
+
+  const fetchCourses = () => {
+    fetch(`http://192.168.100.38:3000/api/cursos${selectedSede !== 'all' ? `?sede=${selectedSede}` : ''}`)
       .then(res => res.json())
       .then(data => {
         const formatted = data.map(curso => ({
@@ -79,7 +87,7 @@ export default function App({ navigation }) {
           icon: "📘",
           color: "#1a397c",
           codeHash: curso.hash_codigo,
-          completed: false,
+          completed: completedCoursesList.some(c => c.id === curso.id),
           details: {
             description: curso.descripcion,
             modality: curso.modalidad,
@@ -91,15 +99,15 @@ export default function App({ navigation }) {
           }
         }));
         setCoursesList(formatted);
+        setCompletedCourses(completedCoursesList.length);
       })
       .catch(err => {
         console.error('Error cargando cursos:', err);
       });
+  };
 
-
-    
-// Cargar sedes disponibles
-    fetch('http://192.168.1.75:3000/api/cursos/sedes')
+  const fetchSedes = () => {
+    fetch('http://192.168.100.38:3000/api/cursos/sedes')
       .then(res => res.json())
       .then(data => {
         setSedes([
@@ -110,7 +118,28 @@ export default function App({ navigation }) {
       .catch(err => {
         console.error('Error cargando sedes:', err);
       });
-  }, [selectedSede]);
+  };
+
+  const loadCompletedCourses = async () => {
+    try {
+      const response = await fetch(`http://192.168.100.38:3000/api/cursos/completados/${user.id}`);
+      if (response.ok) {
+        const data = await response.json();
+        setCompletedCoursesList(data);
+        setCompletedCourses(data.length);
+        
+        // Actualizar estado de completados en la lista principal
+        setCoursesList(prevCourses => 
+          prevCourses.map(course => ({
+            ...course,
+            completed: data.some(completed => completed.id === course.id)
+          }))
+        );
+      }
+    } catch (error) {
+      console.error('Error al cargar cursos completados:', error);
+    }
+  };
 
   // Timer para el bloqueo temporal
   useEffect(() => {
@@ -130,14 +159,17 @@ export default function App({ navigation }) {
     };
   }, [isBlocked, blockTimeLeft]);
 
-  // FUNCIÓN FALTANTE - Mostrar modal de entrada de código
   const showCodeInputModal = () => {
     setShowCodeInput(true);
-    setSelectedCourse(null); // Cerrar el modal de detalles
+    setSelectedCourse(null);
   };
 
-  // Validación mejorada de códigos con sistema de intentos
   const verifyManualCode = async () => {
+    if (!user?.id) {
+      Alert.alert("Error", "Debes iniciar sesión para validar cursos");
+      return;
+    }
+
     if (isBlocked) {
       Alert.alert("Acceso Bloqueado", `Esperá ${blockTimeLeft} segundos antes de intentar nuevamente.`);
       return;
@@ -156,38 +188,29 @@ export default function App({ navigation }) {
     setIsValidating(true);
 
     try {
-      const res = await fetch("http://192.168.1.75:3000/api/cursos/validar", {
+      const res = await fetch("http://192.168.100.38:3000/api/cursos/validar", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({ codigo: manualCode.trim() })
+        body: JSON.stringify({ 
+          codigo: manualCode.trim(),
+          alumnoId: user.id
+        })
       });
 
       const data = await res.json();
 
       if (res.ok && data.valid) {
-        // Marca como completado en el frontend
-        const updatedCourses = [...coursesList];
-        const courseIndex = updatedCourses.findIndex(c => c.title === data.curso.titulo);
-
-        if (courseIndex !== -1 && !updatedCourses[courseIndex].completed) {
-          updatedCourses[courseIndex].completed = true;
-          updatedCourses[courseIndex].completionCode = generateSecureCode();
-          setCoursesList(updatedCourses);
-          setCompletedCourses(prev => prev + 1);
-          setAttemptCount(0);
-
-          setShowCompletionCode({
-            type: 'image',
-            image: FlamaGif,
-            title: `🔥 ¡Felicidades! Has completado el curso "${updatedCourses[courseIndex].title}" 🔥`
-          });
-
-        } else {
-          Alert.alert("Curso ya completado", `El curso "${data.curso.titulo}" ya ha sido completado.`);
-        }
-
+        // Recargar cursos completados
+        await loadCompletedCourses();
+        
+        setAttemptCount(0);
+        setShowCompletionCode({
+          type: 'image',
+          image: FlamaGif,
+          title: `🔥 ¡Felicidades! Has completado el curso "${data.curso.titulo}" 🔥`
+        });
       } else {
         throw new Error(data.message || "Código inválido");
       }
@@ -202,11 +225,11 @@ export default function App({ navigation }) {
       } else {
         Alert.alert("Código incorrecto", `${err.message}. Intentos restantes: ${3 - newAttemptCount}`);
       }
+    } finally {
+      setManualCode('');
+      setShowCodeInput(false);
+      setIsValidating(false);
     }
-
-    setManualCode('');
-    setShowCodeInput(false);
-    setIsValidating(false);
   };
 
   const SedeSelector = () => (
@@ -626,7 +649,7 @@ export default function App({ navigation }) {
     );
   };
 
-  return (
+   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" />
       
@@ -640,7 +663,7 @@ export default function App({ navigation }) {
             <View style={[styles.statIcon, { backgroundColor: '#6ab04c' }]}>
               <Text>!</Text>
             </View>
-            <Text style={styles.statValue}>1</Text>
+            <Text style={styles.statValue}>0</Text>
           </View>
           
           <View style={styles.statItem}>
@@ -711,6 +734,7 @@ export default function App({ navigation }) {
     </SafeAreaView>
   );
 }
+
 
 const styles = StyleSheet.create({
   container: {

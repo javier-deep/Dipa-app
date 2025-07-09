@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, Text, Image, StyleSheet } from 'react-native';
+import { View, Text, Image, StyleSheet, TouchableOpacity } from 'react-native';
+import AvatarDisplay from '../screens/AvatarDisplay'; // Asegúrate de que la ruta sea correcta
 
-const RegistroC = () => {
+const RegistroC = ({ navigation }) => {
   return (
     <View style={styles.container}>
       {/* Barra de progreso con estrella */}
@@ -15,8 +16,18 @@ const RegistroC = () => {
         <Text style={styles.dialogText}>¡Ya eres un rugidor oficial!</Text>
       </View>
 
-      {/* Imagen del león */}
-      <Image source={require('../../assets/alex.png')} style={styles.lionImage} />
+      {/* Muestra el avatar personalizado */}
+      <View style={styles.avatarContainer}>
+        <AvatarDisplay size={250} />
+      </View>
+
+      {/* Botón para finalizar */}
+      <TouchableOpacity
+        style={styles.finishButton}
+        onPress={() => navigation.navigate('Inicio')}
+      >
+        <Text style={styles.finishButtonText}>FINALIZAR</Text>
+      </TouchableOpacity>
     </View>
   );
 };
@@ -30,26 +41,26 @@ const styles = StyleSheet.create({
   },
   progressBarContainer: {
     width: '90%',
-    height: 20,
+    height: 25,
     backgroundColor: '#E0E0E0',
     borderRadius: 70,
     position: 'relative',
-    marginBottom: 10,
+    marginBottom: 25,
     overflow: 'hidden',
     justifyContent: 'center',
   },
   progressBar: {
     height: '100%',
     width: '100%',
-    backgroundColor: '#2E4B9C', // azul oscuro
+    backgroundColor: '#2E4B9C',
     borderRadius: 70,
   },
   starIcon: {
     position: 'absolute',
-    right: -10,
+    right: -9,
     top: -8,
     width: 60,
-    height: 45,
+    height: 35,
     resizeMode: 'contain',
   },
   dialogBox: {
@@ -59,7 +70,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderColor: '#ccc',
     borderWidth: 1,
-    marginBottom: 10,
+    marginBottom: 30,
     elevation: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -72,10 +83,30 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textAlign: 'center',
   },
-  lionImage: {
-    width: 500,
-    height: 350,
-    resizeMode: 'contain',
+  avatarContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 20,
+  },
+  
+  finishButton: {
+    backgroundColor: '#2E4B9C',
+    paddingVertical: 15,
+    paddingHorizontal: 30,
+    borderRadius: 55,
+    marginBottom: 40,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 5,
+  },
+  finishButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+    textTransform: 'uppercase',
   },
 });
 

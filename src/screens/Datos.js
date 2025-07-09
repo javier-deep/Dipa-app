@@ -1,37 +1,82 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { 
+  View, 
+  Text, 
+  TouchableOpacity, 
+  StyleSheet, 
+  ActivityIndicator,
+  Alert 
+} from 'react-native';
 import { Image } from "expo-image";
 
+export default function Datos({ navigation, route }) {
+  const [userData, setUserData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const { matricula } = route.params;
 
-export default function Datos({ navigation }) {
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const response = await fetch(`http://192.168.100.38:3000/api/auth/user/${matricula}`);
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Error al obtener datos');
+        }
+
+        setUserData(data);
+      } catch (error) {
+        Alert.alert('Error', error.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUserData();
+  }, [matricula]);
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center' }]}>
+        <ActivityIndicator size="large" color="#0056b3" />
+      </View>
+    );
+  }
+
+  if (!userData) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center' }]}>
+        <Text>No se encontraron datos del usuario</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
-      {/* Barra de progreso */}
       <View style={styles.progressBarContainer}>
-        <View style={[styles.progressBar, { width: '60%' }]} /> {/* 60% progreso */}
+        <View style={[styles.progressBar, { width: '60%' }]} />
       </View>
 
-      {/* Bienvenida */}
       <View style={styles.dialogContainer}>
-        <Text style={styles.dialogText}>¡Bienvenido a tu manada, Álvaro Díaz!</Text>
+        <Text style={styles.dialogText}>
+          ¡Bienvenido a tu manada, {userData.nombres} {userData.primer_apellido}!
+        </Text>
       </View>
 
-      {/* Imagen del león */}
       <Image
         source={require('../../assets/Datos.gif')} 
         style={styles.image}
       />
 
-      {/* Información del usuario */}
       <View style={styles.infoContainer}>
-        <Text style={styles.infoText}>Nombre: José Álvaro Díaz Plascencia</Text>
-        <Text style={styles.infoText}>Rol: Bombero</Text>
-        <Text style={styles.infoText}>Generación: Generación 17</Text>
-        <Text style={styles.infoText}>ID: CUD2025000305</Text>
-        <Text style={styles.infoText}>Sede: Guadalajara, Jal.</Text>
+        <Text style={styles.infoText}>
+          Nombre: {userData.nombres} {userData.primer_apellido} {userData.segundo_apellido}
+        </Text>
+        <Text style={styles.infoText}>Generación: {userData.generacion}</Text>
+        <Text style={styles.infoText}>Matricula: {userData.matricula}</Text>
+        <Text style={styles.infoText}>Academia: {userData.sede}</Text>
       </View>
 
-      {/* Botón CONTINUAR */}
       <TouchableOpacity
         style={styles.continueButton}
         onPress={() => navigation.navigate('Avatar')}
@@ -86,7 +131,7 @@ const styles = StyleSheet.create({
     padding: 20,
     borderRadius: 10,
     marginVertical: 15,
-    alignItems: 'flex-start', // Alinear texto a la izquierda
+    alignItems: 'flex-start',
   },
   infoText: {
     fontSize: 16,

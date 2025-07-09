@@ -5,33 +5,71 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView
+  SafeAreaView,
+  Alert,
+  ActivityIndicator
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
-import Home from './HomeScreen';
-import Inicio from './Inicio';
+import { useAuth } from '../context/AuthContext';
 
-
-export default function Login({navigation}) {
+export default function Login({ navigation }) {
   const [showPassword, setShowPassword] = useState(false);
   const [matricula, setMatricula] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const { login } = useAuth();
+
+  const handleLogin = async () => {
+    if (!matricula || !password) {
+      Alert.alert('Error', 'Por favor completa todos los campos');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch('http://192.168.100.38:3000/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ matricula, password }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Error al iniciar sesión');
+      }
+
+      // Usar el AuthContext para manejar el login
+      await login(data.user, data.token);
+
+      navigation.navigate('Principal');
+    } catch (error) {
+      Alert.alert('Error', error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
-      <TouchableOpacity style={styles.backButton} onPress={()=> navigation.navigate('Inicio')}>
+      <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
         <Ionicons name="arrow-back-outline" size={24} color="#000" />
       </TouchableOpacity>
 
       <Text style={styles.title}>Ingresa tus datos</Text>
 
       <View style={styles.inputContainer}>
+        {/* Campo de matrícula */}
         <TextInput
           style={styles.input}
           placeholder="Número de matrícula"
           value={matricula}
           onChangeText={setMatricula}
+          autoCapitalize="characters"
+          textContentType="username"
+          autoCorrect={false}
         />
         <View style={styles.passwordContainer}>
           <TextInput
@@ -41,9 +79,7 @@ export default function Login({navigation}) {
             value={password}
             onChangeText={setPassword}
           />
-          <TouchableOpacity
-            onPress={() => setShowPassword(!showPassword)}
-          >
+          <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
             <Ionicons
               name={showPassword ? 'eye-off-outline' : 'eye-outline'}
               size={22}
@@ -53,15 +89,23 @@ export default function Login({navigation}) {
         </View>
       </View>
 
-      <TouchableOpacity style={styles.loginButton} onPress={() => navigation.navigate('Principal')}>
-        <Text style={styles.loginText}>INGRESAR</Text>
+      <TouchableOpacity
+        style={styles.loginButton}
+        onPress={handleLogin}
+        disabled={loading}
+      >
+        {loading ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Text style={styles.loginText}>INGRESAR</Text>
+        )}
       </TouchableOpacity>
 
-      <TouchableOpacity>
+      <TouchableOpacity onPress={() => navigation.navigate('RecuperarContraseña')}>
         <Text style={styles.link}>Restablecer contraseña</Text>
       </TouchableOpacity>
 
-      <View style={styles.feedbackContainer}>
+<View style={styles.feedbackContainer}>
         <Text style={styles.brand}>Maxnic</Text>
         <Text style={styles.feedbackText}>
           ¿Estás disfrutando de mi compañía en la app?
@@ -78,6 +122,7 @@ export default function Login({navigation}) {
         Al registrarte en Maxnic, aceptas nuestros{' '}
         <Text style={styles.termsLink}>Términos y Políticas de privacidad.</Text>
       </Text>
+
     </SafeAreaView>
   );
 }

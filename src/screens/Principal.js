@@ -21,7 +21,7 @@ const Principal = () => {
   const scrollViewRef = useRef(null);
 
   // Ajusta esta 2URL según tu entorno de desarrollo
-  const API_URL = 'http://192.168.1.75:3000/api/banners';
+  const API_URL = 'http://192.168.100.38:3000/api/banners';
   const INSTAGRAM_URL = 'https://www.instagram.com/dipa_oficial/'; // Cambia por tu cuenta real
 
   useEffect(() => {
