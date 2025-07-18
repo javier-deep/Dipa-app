@@ -72,9 +72,9 @@ export default function Datos({ navigation, route }) {
         <Text style={styles.infoText}>
           Nombre: {userData.nombres} {userData.primer_apellido} {userData.segundo_apellido}
         </Text>
-        <Text style={styles.infoText}>Generación: {userData.generacion}</Text>
+        <Text style={styles.infoText}>Estado: {userData.estado}</Text>
         <Text style={styles.infoText}>Matricula: {userData.matricula}</Text>
-        <Text style={styles.infoText}>Academia: {userData.sede}</Text>
+        <Text style={styles.infoText}>Ciudad: {userData.ciudad}</Text>
       </View>
 
       <TouchableOpacity

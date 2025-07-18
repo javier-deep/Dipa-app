@@ -14,12 +14,20 @@ const compareTimes = (time1, time2) => {
 const obtenerCursos = (req, res) => {
   const { sede } = req.query;
   
-  let query = 'SELECT t.*, s.nombre as nombre_sede FROM talleres t LEFT JOIN sedes s ON t.sede = s.id';
+  let query = `
+    SELECT t.*, s.nombre as nombre_sede 
+    FROM talleres t 
+    LEFT JOIN sedes s ON t.sede = s.id
+  `;
   const params = [];
   
+  // Validación mejorada
   if (sede && sede !== 'all') {
-    query += ' WHERE t.sede = ?';
-    params.push(sede);
+    const sedeId = parseInt(sede, 10);
+    if (!isNaN(sedeId) && sedeId > 0) {
+      query += ' WHERE t.sede = ?';
+      params.push(sedeId);
+    }
   }
 
   db.query(query, params, (err, results) => {

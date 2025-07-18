@@ -4,7 +4,6 @@ import {
   Text, 
   View, 
   TouchableOpacity, 
-  Image,
   ScrollView,
   SafeAreaView,
   Dimensions,
@@ -16,12 +15,36 @@ import {
   TextInput,
   Keyboard
 } from 'react-native';
+import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 const { width } = Dimensions.get('window');
-import FlamaGif from '../../assets/flama.gif';
-//import { useAuth } from '../../context/AuthContext'; // Asegúrate de tener este contexto
+import FlamaGif from '../../assets/flama-1.gif';
 import { useAuth } from '../context/AuthContext';
+
+// Helper para mostrar alertas consistentes
+const showAlert = (title, message, options = {}) => {
+  Alert.alert(
+    title,
+    message,
+    [
+      { 
+        text: options.okText || 'OK', 
+        onPress: options.onOk,
+        style: options.okStyle || 'default'
+      },
+      ...(options.cancelText ? [
+        { 
+          text: options.cancelText, 
+          onPress: options.onCancel,
+          style: 'cancel' 
+        }
+      ] : [])
+    ],
+    { cancelable: options.cancelable !== false }
+  );
+};
+
 // Función para hashear códigos
 const hashCode = (code) => {
   let hash = 0;
@@ -50,7 +73,7 @@ const generateSecureCode = () => {
 };
 
 export default function App({ navigation }) {
-  const { user } = useAuth(); // Obtener usuario autenticado
+  const { user } = useAuth();
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [completedCourses, setCompletedCourses] = useState(0);
   const [showCodeInput, setShowCodeInput] = useState(false);
@@ -68,18 +91,29 @@ export default function App({ navigation }) {
   const textInputRef = useRef(null);
   const blockTimerRef = useRef(null);
 
-  // Cargar cursos y sedes
+  // Cargar sedes y cursos completados al montar
   useEffect(() => {
-    fetchCourses();
     fetchSedes();
     if (user?.id) {
       loadCompletedCourses();
     }
-  }, [selectedSede, user?.id]);
+  }, [user?.id]);
+
+  // Cargar cursos cuando cambia la sede o cursos completados
+  useEffect(() => {
+    fetchCourses();
+  }, [selectedSede, completedCoursesList]);
 
   const fetchCourses = () => {
-    fetch(`http://192.168.100.38:3000/api/cursos${selectedSede !== 'all' ? `?sede=${selectedSede}` : ''}`)
-      .then(res => res.json())
+    const sedeParam = selectedSede !== 'all' && !isNaN(selectedSede) 
+      ? `?sede=${parseInt(selectedSede, 10)}` 
+      : '';
+    
+    fetch(`http://192.168.100.38:3000/api/cursos${sedeParam}`)
+      .then(res => {
+        if (!res.ok) throw new Error('Error en la respuesta del servidor');
+        return res.json();
+      })
       .then(data => {
         const formatted = data.map(curso => ({
           id: curso.id,
@@ -99,24 +133,31 @@ export default function App({ navigation }) {
           }
         }));
         setCoursesList(formatted);
-        setCompletedCourses(completedCoursesList.length);
       })
       .catch(err => {
         console.error('Error cargando cursos:', err);
+        showAlert("Error", "No se pudieron cargar los cursos. Intenta más tarde.");
       });
   };
 
   const fetchSedes = () => {
     fetch('http://192.168.100.38:3000/api/cursos/sedes')
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error('Error al cargar sedes');
+        return res.json();
+      })
       .then(data => {
         setSedes([
           { id: 'all', name: 'Todas las sedes' },
-          ...data.map(sede => ({ id: sede.id, name: sede.nombre }))
+          ...data.map(sede => ({ 
+            id: sede.id.toString(),
+            name: sede.nombre 
+          }))
         ]);
       })
       .catch(err => {
         console.error('Error cargando sedes:', err);
+        showAlert("Error", "No se pudieron cargar las sedes. Intenta más tarde.");
       });
   };
 
@@ -128,7 +169,6 @@ export default function App({ navigation }) {
         setCompletedCoursesList(data);
         setCompletedCourses(data.length);
         
-        // Actualizar estado de completados en la lista principal
         setCoursesList(prevCourses => 
           prevCourses.map(course => ({
             ...course,
@@ -138,6 +178,7 @@ export default function App({ navigation }) {
       }
     } catch (error) {
       console.error('Error al cargar cursos completados:', error);
+      showAlert("Error", "No se pudieron cargar los cursos completados.");
     }
   };
 
@@ -166,22 +207,35 @@ export default function App({ navigation }) {
 
   const verifyManualCode = async () => {
     if (!user?.id) {
-      Alert.alert("Error", "Debes iniciar sesión para validar cursos");
+      showAlert("Error", "Debes iniciar sesión para validar cursos", {
+        okText: "Entendido",
+        okStyle: "destructive"
+      });
       return;
     }
 
     if (isBlocked) {
-      Alert.alert("Acceso Bloqueado", `Esperá ${blockTimeLeft} segundos antes de intentar nuevamente.`);
+      showAlert(
+        "Acceso Bloqueado", 
+        `Esperá ${blockTimeLeft} segundos antes de intentar nuevamente.`,
+        { okText: "OK" }
+      );
       return;
     }
 
-    if (!manualCode.trim()) {
-      Alert.alert("Error", "Por favor ingresa el código de finalización");
+    const trimmedCode = manualCode.trim();
+    
+    if (!trimmedCode) {
+      showAlert("Error", "Por favor ingresa el código de finalización");
       return;
     }
 
-    if (!validateCodeFormat(manualCode.trim())) {
-      Alert.alert("Formato Incorrecto", "El código debe tener entre 6-12 caracteres alfanuméricos");
+    if (!validateCodeFormat(trimmedCode)) {
+      showAlert(
+        "Formato Incorrecto", 
+        "El código debe tener entre 6-12 caracteres alfanuméricos",
+        { okText: "Entendido" }
+      );
       return;
     }
 
@@ -190,11 +244,9 @@ export default function App({ navigation }) {
     try {
       const res = await fetch("http://192.168.100.38:3000/api/cursos/validar", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
-          codigo: manualCode.trim(),
+          codigo: trimmedCode,
           alumnoId: user.id
         })
       });
@@ -202,9 +254,7 @@ export default function App({ navigation }) {
       const data = await res.json();
 
       if (res.ok && data.valid) {
-        // Recargar cursos completados
         await loadCompletedCourses();
-        
         setAttemptCount(0);
         setShowCompletionCode({
           type: 'image',
@@ -221,9 +271,17 @@ export default function App({ navigation }) {
       if (newAttemptCount >= 3) {
         setIsBlocked(true);
         setBlockTimeLeft(30);
-        Alert.alert("Demasiados Intentos", "Has superado el número máximo de intentos. Bloqueado por 30 segundos.");
+        showAlert(
+          "Demasiados Intentos", 
+          "Has superado el número máximo de intentos. Bloqueado por 30 segundos.",
+          { okText: "Entendido" }
+        );
       } else {
-        Alert.alert("Código incorrecto", `${err.message}. Intentos restantes: ${3 - newAttemptCount}`);
+        showAlert(
+          "Código incorrecto", 
+          `${err.message}. Intentos restantes: ${3 - newAttemptCount}`,
+          { okText: "Intentar de nuevo" }
+        );
       }
     } finally {
       setManualCode('');
@@ -449,7 +507,7 @@ export default function App({ navigation }) {
                     style={styles.showCodeButton}
                     onPress={() => setShowCompletionCode({
                       type: 'code',
-                      code: course.completionCode || 'COMPLETED'
+                      code: course.completionCode || 'COMPLETADO'
                     })}
                   >
                     <Text style={styles.showCodeButtonText}>Ver código de completado</Text>
@@ -601,42 +659,51 @@ export default function App({ navigation }) {
   const CompletionCodeModal = () => {
     if (!showCompletionCode) return null;
 
+    const renderContent = () => {
+      if (showCompletionCode.type === 'image') {
+        return (
+          <>
+            <Image 
+              source={FlamaGif}
+              style={styles.completionImage}
+              contentFit="contain"
+              transition={1000}
+            />
+            <Text style={styles.codeDisplayTitle}>
+              {showCompletionCode.title}
+            </Text>
+            <Text style={styles.codeDisplayText}>
+              Sigue así y no pierdas tu racha
+            </Text>
+          </>
+        );
+      } else {
+        return (
+          <>
+            <Ionicons name="shield-checkmark" size={50} color="#2ecc71" />
+            <Text style={styles.codeDisplayTitle}>Código de Completado</Text>
+            <View style={styles.codeDisplayCodeContainer}>
+              <Text style={styles.codeDisplayCode}>{showCompletionCode.code}</Text>
+            </View>
+            <Text style={styles.codeDisplayText}>
+              Este código confirma que has completado el curso exitosamente.
+              Guárdalo como comprobante de finalización.
+            </Text>
+          </>
+        );
+      }
+    };
+
     return (
       <Modal
-  animationType="fade"
-  transparent={true}
-  visible={!!showCompletionCode}
-  onRequestClose={() => setShowCompletionCode(null)}
->
-  <View style={styles.codeDisplayContainer}>
-    <View style={styles.codeDisplayContent}>
-      {showCompletionCode.type === 'image' ? (
-        <>
-          <Image 
-            source={showCompletionCode.image} 
-            style={styles.completionImage}
-            resizeMode="contain"
-          />
-          <Text style={styles.codeDisplayTitle}>
-            {showCompletionCode.title}
-          </Text>
-          <Text style={styles.codeDisplayText}>
-            Sigue así y no pierdas tu racha
-          </Text>
-        </>
-      ) : (
-              <>
-                <Ionicons name="shield-checkmark" size={50} color="#2ecc71" />
-                <Text style={styles.codeDisplayTitle}>Código de Completado</Text>
-                <View style={styles.codeDisplayCodeContainer}>
-                  <Text style={styles.codeDisplayCode}>{showCompletionCode.code}</Text>
-                </View>
-                <Text style={styles.codeDisplayText}>
-                  Este código confirma que has completado el curso exitosamente.
-                  Guárdalo como comprobante de finalización.
-                </Text>
-              </>
-            )}
+        animationType="fade"
+        transparent={true}
+        visible={!!showCompletionCode}
+        onRequestClose={() => setShowCompletionCode(null)}
+      >
+        <View style={styles.codeDisplayContainer}>
+          <View style={styles.codeDisplayContent}>
+            {renderContent()}
             <TouchableOpacity 
               style={styles.codeDisplayButton}
               onPress={() => setShowCompletionCode(null)}
@@ -649,7 +716,7 @@ export default function App({ navigation }) {
     );
   };
 
-   return (
+  return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" />
       
@@ -684,7 +751,7 @@ export default function App({ navigation }) {
             <View style={[styles.statIcon, { backgroundColor: '#6c5ce7' }]}>
               <Ionicons name="paw" size={16} color="white" />
             </View>
-            <Text style={styles.statValue}>5</Text>
+            <Text style={styles.statValue}>0</Text>
           </View>
         </View>
         
@@ -702,7 +769,7 @@ export default function App({ navigation }) {
         <Image 
           source={{ uri: 'https://vignette.wikia.nocookie.net/doblaje/images/f/f2/Alexleon.png/revision/latest?cb=20141225032252&path-prefix=es' }} 
           style={styles.mascotImage}
-          resizeMode="contain"
+          contentFit="contain"
         />
         <View style={styles.speechBubble}>
           <Text style={styles.speechBubbleText}>
@@ -723,7 +790,6 @@ export default function App({ navigation }) {
           ))}
         </ScrollView>
       </View>
-      
       <CourseDetailsModal 
         course={selectedCourse} 
         onClose={() => setSelectedCourse(null)} 
@@ -734,7 +800,6 @@ export default function App({ navigation }) {
     </SafeAreaView>
   );
 }
-
 
 const styles = StyleSheet.create({
   container: {
@@ -797,7 +862,6 @@ const styles = StyleSheet.create({
   mascotImage: {
     width: 80,
     height: 80,
-    resizeMode: 'contain',
   },
   speechBubble: {
     flex: 1,
@@ -1129,24 +1193,31 @@ const styles = StyleSheet.create({
     width: '80%',
     alignItems: 'center',
   },
-  
   codeDisplayTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 15,
     color: '#1a397c',
+    textAlign: 'center',
+  },
+  codeDisplayCodeContainer: {
+    padding: 15,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    marginVertical: 15,
   },
   codeDisplayCode: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 20,
     color: '#2ecc71',
+    letterSpacing: 2,
   },
   codeDisplayText: {
     fontSize: 14,
     color: '#555',
     textAlign: 'center',
     marginBottom: 20,
+    lineHeight: 20,
   },
   codeDisplayButton: {
     padding: 12,
@@ -1159,13 +1230,11 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: 'bold',
   },
-
   completionImage: {
     width: 250,
     height: 250,
     marginBottom: 20,
   },
-
   sedeSelectorContainer: {
     marginTop: 10,
     marginBottom: 15,
@@ -1199,5 +1268,4 @@ const styles = StyleSheet.create({
   sedeOptionTextSelected: {
     color: 'white',
   },
-
 });

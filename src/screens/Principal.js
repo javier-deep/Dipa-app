@@ -4,25 +4,30 @@ import Icon from 'react-native-vector-icons/FontAwesome5';
 import * as Animatable from 'react-native-animatable';
 import { useNavigation } from '@react-navigation/native';
 import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
 
 const screenWidth = Dimensions.get('window').width;
 
 const Principal = () => {
   const navigation = useNavigation();
+  const { user } = useAuth();
   const [banners, setBanners] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [userData, setUserData] = useState(null); // Nuevo estado para datos del usuario
+  
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
   const [achievements, setAchievements] = useState({
-    dipaLover: false, // Ahora inicia bloqueado
+    dipaLover: false,
     instagramFollower: false,
     socialInfluencer: false
   });
+  const [completedCourses, setCompletedCourses] = useState(0);
   const scrollViewRef = useRef(null);
 
-  // Ajusta esta 2URL según tu entorno de desarrollo
   const API_URL = 'http://192.168.100.38:3000/api/banners';
-  const INSTAGRAM_URL = 'https://www.instagram.com/dipa_oficial/'; // Cambia por tu cuenta real
+  const USER_API_URL = 'http://192.168.100.38:3000/api/auth/user'; // URL para obtener datos del usuario
+  const INSTAGRAM_URL = 'https://www.instagram.com/dipa_oficial/';
 
   useEffect(() => {
     const fetchBanners = async () => {
@@ -37,36 +42,54 @@ const Principal = () => {
       }
     };
 
-    fetchBanners();
-    // Cargar logros guardados
-    loadAchievements();
-  }, []);
+    const fetchUserData = async () => {
+      if (user?.matricula) {
+        try {
+          const response = await axios.get(`${USER_API_URL}/${user.matricula}`);
+          setUserData(response.data);
+        } catch (err) {
+          console.error('Error fetching user data:', err);
+        }
+      }
+    };
 
-  // Función para cargar logros desde AsyncStorage o API
+    const loadCompletedCourses = async () => {
+      if (user?.id) {
+        try {
+          const response = await fetch(`http://192.168.100.38:3000/api/cursos/completados/${user.id}`);
+          if (response.ok) {
+            const data = await response.json();
+            setCompletedCourses(data.length);
+          }
+        } catch (error) {
+          console.error('Error al cargar cursos completados:', error);
+        }
+      }
+    };
+
+    fetchBanners();
+    fetchUserData(); // Llamar a la función para obtener datos del usuario
+    loadAchievements();
+    loadCompletedCourses();
+  }, [user?.id, user?.matricula]);
+
   const loadAchievements = async () => {
     try {
-      // Aquí puedes implementar la carga desde AsyncStorage o tu API
-      // const savedAchievements = await AsyncStorage.getItem('achievements');
-      // if (savedAchievements) {
-      //   setAchievements(JSON.parse(savedAchievements));
-      // }
+      // Implementación para cargar logros desde AsyncStorage o API
     } catch (error) {
       console.error('Error loading achievements:', error);
     }
   };
 
-  // Función para guardar logros
   const saveAchievements = async (newAchievements) => {
     try {
-      // Aquí puedes implementar el guardado en AsyncStorage o tu API
-      // await AsyncStorage.setItem('achievements', JSON.stringify(newAchievements));
+      // Implementación para guardar logros
       setAchievements(newAchievements);
     } catch (error) {
       console.error('Error saving achievements:', error);
     }
   };
 
-  // Función para manejar el logro de DIPA LOVER
   const handleDipaLoverAchievement = () => {
     Alert.alert(
       "🐾 ¡Desbloquea DIPA LOVER!",
@@ -84,21 +107,17 @@ const Principal = () => {
     );
   };
 
-  // Función para abrir Instagram
   const openInstagram = async () => {
     try {
-      // Intenta abrir la app de Instagram primero
       const instagramApp = `instagram://user?username=dipa_oficial`;
       const canOpen = await Linking.canOpenURL(instagramApp);
       
       if (canOpen) {
         await Linking.openURL(instagramApp);
       } else {
-        // Si no puede abrir la app, abre en el navegador
         await Linking.openURL(INSTAGRAM_URL);
       }
       
-      // Mostrar diálogo de confirmación después de un pequeño delay
       setTimeout(() => {
         showFollowConfirmation();
       }, 3000);
@@ -109,7 +128,6 @@ const Principal = () => {
     }
   };
 
-  // Función para confirmar que siguió la cuenta
   const showFollowConfirmation = () => {
     Alert.alert(
       "¿Ya nos sigues?",
@@ -127,7 +145,6 @@ const Principal = () => {
     );
   };
 
-  // Función para desbloquear el logro DIPA LOVER
   const unlockDipaLoverAchievement = () => {
     const newAchievements = {
       ...achievements,
@@ -136,7 +153,6 @@ const Principal = () => {
     
     saveAchievements(newAchievements);
     
-    // Mostrar animación de logro desbloqueado
     Alert.alert(
       " ¡Logro Desbloqueado!",
       "¡Felicidades! Ahora eres oficialmente un DIPA LOVER 🐾\n¡Gracias por seguirnos en Instagram!",
@@ -149,7 +165,6 @@ const Principal = () => {
     );
   };
 
-  // Auto-scroll del carrusel
   useEffect(() => {
     if (banners.length > 1) {
       const interval = setInterval(() => {
@@ -181,7 +196,17 @@ const Principal = () => {
     });
   };
 
-  // Componente de carga
+  // Función para formatear el nombre completo
+  const getFullName = () => {
+    if (!userData) return 'Usuario';
+    
+    const nombres = userData.nombres || '';
+    const primerApellido = userData.primer_apellido || '';
+    const segundoApellido = userData.segundo_apellido || '';
+    
+    return `${nombres} ${primerApellido} ${segundoApellido}`.trim();
+  };
+
   if (loading) {
     return (
       <View style={[styles.container, styles.center]}>
@@ -191,7 +216,6 @@ const Principal = () => {
     );
   }
 
-  // Componente de error
   if (error) {
     return (
       <View style={[styles.container, styles.center]}>
@@ -266,54 +290,54 @@ const Principal = () => {
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Encabezado superior */}
-      <View style={styles.topBar}>
-        <TouchableOpacity>
-          <Icon name="arrow-left" size={20} color="#333" />
+      {/* Nueva barra de iconos */}
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+          <Icon name="arrow-left" size={24} color="#666" />
         </TouchableOpacity>
-        <TouchableOpacity>
-          <Icon name="cog" size={20} color="#333" />
+        
+        <View style={styles.statsContainer}>
+          <View style={styles.statItem}>
+            <View style={[styles.statIcon, { backgroundColor: '#6ab04c' }]}>
+              <Text style={{ color: 'white', fontWeight: 'bold' }}>!</Text>
+            </View>
+            <Text style={styles.statValue}>0</Text>
+          </View>
+          
+          <View style={styles.statItem}>
+            <View style={[styles.statIcon, { backgroundColor: '#3498db' }]}>
+              <Icon name="podcast" size={16} color="white" />
+            </View>
+            <Text style={styles.statValue}>0</Text>
+          </View>
+          
+          <View style={styles.statItem}>
+            <View style={[styles.statIcon, { backgroundColor: '#e17055' }]}>
+              <Icon name="fire" size={16} color="white" />
+            </View>
+            <Text style={styles.statValue}>{completedCourses}</Text>
+          </View>
+          
+          <View style={styles.statItem}>
+            <View style={[styles.statIcon, { backgroundColor: '#6c5ce7' }]}>
+              <Icon name="paw" size={16} color="white" />
+            </View>
+            <Text style={styles.statValue}>
+              {Object.values(achievements).filter(Boolean).length}
+            </Text>
+          </View>
+        </View>
+        
+        <TouchableOpacity style={styles.settingsButton}>
+          <Icon name="cog" size={24} color="#666" />
         </TouchableOpacity>
-      </View>
-
-      {/* Stats container */}
-      <View style={styles.statsContainer}>
-        <Animatable.View animation="bounceIn" delay={200} style={styles.statItem}>
-          <View style={[styles.statIcon, { backgroundColor: '#6ab04c' }]}>
-            <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 16 }}>!</Text>
-          </View>
-          <Text style={styles.statValue}>0</Text>
-        </Animatable.View>
-
-        <Animatable.View animation="bounceIn" delay={400} style={styles.statItem}>
-          <View style={[styles.statIcon, { backgroundColor: '#3498db' }]}>
-            <Icon name="podcast" size={16} color="white" />
-          </View>
-          <Text style={styles.statValue}>0</Text>
-        </Animatable.View>
-
-        <Animatable.View animation="bounceIn" delay={600} style={styles.statItem}>
-          <View style={[styles.statIcon, { backgroundColor: '#e17055' }]}>
-            <Icon name="fire" size={16} color="white" />
-          </View>
-          <Text style={styles.statValue}>1</Text>
-        </Animatable.View>
-
-        <Animatable.View animation="bounceIn" delay={800} style={styles.statItem}>
-          <View style={[styles.statIcon, { backgroundColor: '#6c5ce7' }]}>
-            <Icon name="paw" size={16} color="white" />
-          </View>
-          <Text style={styles.statValue}>
-            {Object.values(achievements).filter(Boolean).length}
-          </Text>
-        </Animatable.View>
       </View>
 
       {/* Información del perfil */}
       <View style={styles.profileSection}>
         <Image source={require('../../assets/maxx.png')} style={styles.avatar} />
         <View style={styles.profileInfo}>
-          <Text style={styles.name}>Álvaro Díaz</Text>
+          <Text style={styles.name}>{getFullName()}</Text>
           <Text style={styles.university}>Centro Universitario DIPA</Text>
           <View style={styles.badgeContainer}>
             <Text style={styles.badgeGreen}>DIPA ESTUDIO</Text>
@@ -334,7 +358,6 @@ const Principal = () => {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Logros</Text>
         <View style={styles.achievements}>
-          {/* Logro DIPA LOVER - Se desbloquea con Instagram */}
           <TouchableOpacity 
             style={[
               styles.achievementCard,
@@ -357,7 +380,6 @@ const Principal = () => {
             )}
           </TouchableOpacity>
 
-          {/* Logro vacío 1 */}
           <View style={styles.achievementCardEmpty}>
             <Text style={styles.nuevoLabelEmpty}>NUEVO</Text>
             <Icon name="question" size={24} color="#ccc" />
@@ -366,7 +388,6 @@ const Principal = () => {
             </Text>
           </View>
 
-          {/* Logro vacío 2 */}
           <View style={styles.achievementCardEmpty}>
             <Text style={styles.nuevoLabelEmpty}>NUEVO</Text>
             <Icon name="question" size={24} color="#ccc" />
@@ -416,35 +437,42 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: 'bold',
   },
-  topBar: {
+  header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
+    alignItems: 'center',
     paddingTop: 50,
-    paddingBottom: 10,
+    paddingHorizontal: 15,
     backgroundColor: '#f8f9fa',
+  },
+  backButton: {
+    padding: 8,
+  },
+  settingsButton: {
+    padding: 8,
   },
   statsContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginVertical: 15,
-    paddingHorizontal: 40,
-  },
-  statItem: {
-    alignItems: 'center',
-  },
-  statIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 4,
+  },
+  statItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 5,
+  },
+  statIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   statValue: {
-    fontSize: 16,
+    marginLeft: 3,
+    fontSize: 14,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#666',
   },
   profileSection: {
     flexDirection: 'row',
@@ -597,7 +625,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontWeight: 'bold',
   },
-  // Estilos del carrusel
   carouselContainer: {
     marginHorizontal: 20,
     marginBottom: 20,
@@ -651,7 +678,6 @@ const styles = StyleSheet.create({
   inactiveDot: {
     backgroundColor: '#ddd',
   },
-  // Estilos del banner original para el placeholder
   bannerContainer: {
     marginHorizontal: 20,
     marginBottom: 20,

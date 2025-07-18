@@ -12,6 +12,8 @@ exports.getUserData = async (req, res) => {
         nombres, 
         primer_apellido, 
         segundo_apellido, 
+        estado,
+        ciudad,
         no_generacion AS generacion,
         academia AS sede
       FROM alumnos 
