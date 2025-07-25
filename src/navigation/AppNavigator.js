@@ -11,6 +11,7 @@ import RegistroC from '../screens/RegistroC';
 import Login from '../screens/Login';
 import Cursos from '../screens/Cursos';
 import Principal from '../screens/Principal';
+import Perfil from '../screens/Perfil';
 
 const Stack = createStackNavigator();
 
@@ -73,6 +74,7 @@ export default function AppNavigator() {
       <Stack.Screen name="RegistroC" component={RegistroC}/>
       <Stack.Screen name="Login" component={Login} />
       <Stack.Screen name="Cursos" component={Cursos}/>
+      <Stack.Screen name="Perfil" component={Perfil}/>
       <Stack.Screen name="Principal" component={Principal}/>
     </Stack.Navigator>
   );

@@ -14,7 +14,7 @@ const Principal = () => {
   const [banners, setBanners] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [userData, setUserData] = useState(null); // Nuevo estado para datos del usuario
+  const [userData, setUserData] = useState(null);
   
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
   const [achievements, setAchievements] = useState({
@@ -25,8 +25,8 @@ const Principal = () => {
   const [completedCourses, setCompletedCourses] = useState(0);
   const scrollViewRef = useRef(null);
 
-  const API_URL = 'http://192.168.100.38:3000/api/banners';
-  const USER_API_URL = 'http://192.168.100.38:3000/api/auth/user'; // URL para obtener datos del usuario
+  const API_URL = 'http://10.169.169.134:3000/api/banners';
+  const USER_API_URL = 'http://10.169.169.134:3000/api/auth/user';
   const INSTAGRAM_URL = 'https://www.instagram.com/dipa_oficial/';
 
   useEffect(() => {
@@ -56,7 +56,7 @@ const Principal = () => {
     const loadCompletedCourses = async () => {
       if (user?.id) {
         try {
-          const response = await fetch(`http://192.168.100.38:3000/api/cursos/completados/${user.id}`);
+          const response = await fetch(`http://10.169.169.134:3000/api/cursos/completados/${user.id}`);
           if (response.ok) {
             const data = await response.json();
             setCompletedCourses(data.length);
@@ -68,7 +68,7 @@ const Principal = () => {
     };
 
     fetchBanners();
-    fetchUserData(); // Llamar a la función para obtener datos del usuario
+    fetchUserData();
     loadAchievements();
     loadCompletedCourses();
   }, [user?.id, user?.matricula]);
@@ -196,13 +196,13 @@ const Principal = () => {
     });
   };
 
-  // Función para formatear el nombre completo
   const getFullName = () => {
     if (!userData) return 'Usuario';
     
-    const nombres = userData.nombres || '';
-    const primerApellido = userData.primer_apellido || '';
-    const segundoApellido = userData.segundo_apellido || '';
+    // Usa los datos del contexto de autenticación si userData no está disponible
+    const nombres = userData.nombres || user?.nombres || '';
+    const primerApellido = userData.primer_apellido || user?.primer_apellido || '';
+    const segundoApellido = userData.segundo_apellido || user?.segundo_apellido || '';
     
     return `${nombres} ${primerApellido} ${segundoApellido}`.trim();
   };
@@ -290,7 +290,6 @@ const Principal = () => {
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Nueva barra de iconos */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Icon name="arrow-left" size={24} color="#666" />
@@ -328,14 +327,21 @@ const Principal = () => {
           </View>
         </View>
         
-        <TouchableOpacity style={styles.settingsButton}>
+        <TouchableOpacity 
+          style={styles.settingsButton} 
+          onPress={() => navigation.navigate('Perfil')}
+        >
           <Icon name="cog" size={24} color="#666" />
         </TouchableOpacity>
       </View>
 
-      {/* Información del perfil */}
       <View style={styles.profileSection}>
-        <Image source={require('../../assets/maxx.png')} style={styles.avatar} />
+        <Image 
+          source={userData?.avatarConfig ? 
+            { uri: `data:image/png;base64,${userData.avatarConfig}` } : 
+            require('../../assets/maxx.png')} 
+          style={styles.avatar} 
+        />
         <View style={styles.profileInfo}>
           <Text style={styles.name}>{getFullName()}</Text>
           <Text style={styles.university}>Centro Universitario DIPA</Text>
@@ -346,7 +352,6 @@ const Principal = () => {
         </View>
       </View>
 
-      {/* Tarjeta para Cursos y Talleres */}
       <TouchableOpacity
         style={styles.card}
         onPress={() => navigation.navigate('Cursos')}
@@ -354,7 +359,6 @@ const Principal = () => {
         <Text style={styles.cardTitle}>Cursos y Talleres</Text>
       </TouchableOpacity>
 
-      {/* Sección de logros */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Logros</Text>
         <View style={styles.achievements}>
@@ -398,7 +402,6 @@ const Principal = () => {
         </View>
       </View>
 
-      {/* Carrusel de banners */}
       {renderBannerCarousel()}
     </ScrollView>
   );

@@ -10,12 +10,12 @@ router.post('/register', authController.registerPassword);
 router.post('/login', authController.login);
 
 // Actualizar avatar del usuario
-router.post('/update-avatar', authController.updateAvatar);
 
 // Obtener configuración del avatar
-router.get('/avatar/:userId', authController.getAvatar);
 
 // Obtener datos del usuario (pantalla Datos)
 router.get('/user/:matricula', userController.getUserData);
+
+router.get('/current-user', authController.getCurrentUser);
 
 module.exports = router;

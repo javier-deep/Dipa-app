@@ -9,24 +9,46 @@ import {
 } from 'react-native';
 import { Image } from "expo-image";
 
+const API_URL = 'http://10.169.169.134:3000/api/auth';
+
 export default function Datos({ navigation, route }) {
-  const [userData, setUserData] = useState(null);
+  const [userData, setUserData] = useState({
+    nombres: '',
+    primer_apellido: '',
+    segundo_apellido: '',
+    estado: '',
+    matricula: '',
+    ciudad: ''
+  });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const { matricula } = route.params;
 
   useEffect(() => {
     const fetchUserData = async () => {
       try {
-        const response = await fetch(`http://192.168.100.38:3000/api/auth/user/${matricula}`);
+        const response = await fetch(`${API_URL}/user/${matricula}`);
         const data = await response.json();
 
         if (!response.ok) {
-          throw new Error(data.error || 'Error al obtener datos');
+          throw new Error(data.message || 'Error al obtener datos del usuario');
         }
 
-        setUserData(data);
+        if (!data.user) {
+          throw new Error('No se encontraron datos del usuario');
+        }
+
+        setUserData({
+          nombres: data.user.nombre || 'No disponible',
+          primer_apellido: data.user.app || '',
+          segundo_apellido: data.user.apm || '',
+          estado: data.user.estado || 'No disponible',
+          matricula: data.user.matricula || matricula,
+          ciudad: data.user.ciudad || 'No disponible'
+        });
       } catch (error) {
-        Alert.alert('Error', error.message);
+        console.error('Error fetching user data:', error);
+        setError(error.message);
       } finally {
         setLoading(false);
       }
@@ -43,10 +65,20 @@ export default function Datos({ navigation, route }) {
     );
   }
 
-  if (!userData) {
+  if (error) {
     return (
       <View style={[styles.container, { justifyContent: 'center' }]}>
-        <Text>No se encontraron datos del usuario</Text>
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity
+          style={styles.retryButton}
+          onPress={() => {
+            setLoading(true);
+            setError(null);
+            fetchUserData();
+          }}
+        >
+          <Text style={styles.retryButtonText}>Reintentar</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -73,16 +105,16 @@ export default function Datos({ navigation, route }) {
           Nombre: {userData.nombres} {userData.primer_apellido} {userData.segundo_apellido}
         </Text>
         <Text style={styles.infoText}>Estado: {userData.estado}</Text>
-        <Text style={styles.infoText}>Matricula: {userData.matricula}</Text>
+        <Text style={styles.infoText}>Matrícula: {userData.matricula}</Text>
         <Text style={styles.infoText}>Ciudad: {userData.ciudad}</Text>
       </View>
 
       <TouchableOpacity
-        style={styles.continueButton}
-        onPress={() => navigation.navigate('Avatar')}
-      >
-        <Text style={styles.continueButtonText}>CONTINUAR</Text>
-      </TouchableOpacity>
+  style={styles.continueButton}
+  onPress={() => navigation.navigate('Avatar', { matricula: userData.matricula })}
+>
+  <Text style={styles.continueButtonText}>CONTINUAR</Text>
+</TouchableOpacity>
     </View>
   );
 }
@@ -150,5 +182,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#ffffff',
+  },
+  errorText: {
+    color: 'red',
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  retryButton: {
+    backgroundColor: '#0056b3',
+    padding: 15,
+    borderRadius: 5,
+  },
+  retryButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
 });

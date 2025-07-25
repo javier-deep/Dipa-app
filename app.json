@@ -57,7 +57,8 @@
           "cameraPermission": "Permite acceso a la cámara para tomar fotos"
         }
       ],
-      "expo-video"
+      "expo-video",
+      "expo-asset"
     ],
     "extra": {
       "eas": {

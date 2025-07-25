@@ -3,11 +3,12 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
 // Registrar nueva contraseña para matrícula
+// Registrar nueva contraseña para matrícula
 exports.registerPassword = async (req, res) => {
   const { matricula, password } = req.body;
   
   try {
-    // Verificar si la matrícula existe
+    // Verificar si la matrícula existe y si ya tiene contraseña
     const [alumno] = await db.promise().query(
       'SELECT * FROM alumnos WHERE matricula = ?', 
       [matricula]
@@ -15,6 +16,11 @@ exports.registerPassword = async (req, res) => {
     
     if (alumno.length === 0) {
       return res.status(404).json({ error: 'Matrícula no encontrada' });
+    }
+    
+    // Verificar si ya tiene contraseña
+    if (alumno[0].password) {
+      return res.status(400).json({ error: 'La matrícula ya tiene una contraseña registrada' });
     }
     
     // Hashear la contraseña
@@ -181,5 +187,28 @@ exports.login = async (req, res) => {
       error: 'Error interno del servidor',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
+  }
+};
+
+exports.getCurrentUser = async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) return res.status(401).json({ error: 'No autorizado' });
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    
+    const [user] = await db.promise().query(
+      'SELECT id, matricula FROM alumnos WHERE id = ?',
+      [decoded.id]
+    );
+
+    if (user.length === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    res.json({ user: user[0] });
+  } catch (error) {
+    console.error('Error getting current user:', error);
+    res.status(500).json({ error: 'Error al obtener usuario' });
   }
 };

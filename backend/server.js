@@ -6,20 +6,23 @@ dotenv.config();
 
 const app = express();
 
-// Middleware
+// Middleware (sin cambios)
 app.use(cors());
-app.use(express.json({ limit: '10mb' })); // Aumentar límite para imágenes base64
+app.use(express.json({ limit: '10mb' }));
 
-// Rutas
+// Rutas (agregando solo las nuevas)
+const avatarRoutes = require('./routes/avatarRoutes');  // ✅ Nueva ruta del avatar
 const cursosRoutes = require('./routes/cursos');
-const bannersRoutes = require('./routes/banners'); // Nueva ruta
-const authRoutes = require('./routes/authRoutes'); // Nueva ruta de autenticación
+const bannersRoutes = require('./routes/banners');
+const authRoutes = require('./routes/authRoutes');
 
+// Registrar rutas (agregando la nueva)
 app.use('/api/cursos', cursosRoutes);
-app.use('/api/banners', bannersRoutes); // Registrar rutas de banners
-app.use('/api/auth', authRoutes); // Registrar rutas de autenticación
+app.use('/api/banners', bannersRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/avatar', avatarRoutes);  // ✅ Nueva ruta registrada
 
-// Puerto
+// Puerto (sin cambios)
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {

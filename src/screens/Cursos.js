@@ -109,7 +109,7 @@ export default function App({ navigation }) {
       ? `?sede=${parseInt(selectedSede, 10)}` 
       : '';
     
-    fetch(`http://192.168.100.38:3000/api/cursos${sedeParam}`)
+    fetch(`http://192.168.100.19:3000/api/cursos${sedeParam}`)
       .then(res => {
         if (!res.ok) throw new Error('Error en la respuesta del servidor');
         return res.json();
@@ -141,7 +141,7 @@ export default function App({ navigation }) {
   };
 
   const fetchSedes = () => {
-    fetch('http://192.168.100.38:3000/api/cursos/sedes')
+    fetch('http://192.168.100.19:3000/api/cursos/sedes')
       .then(res => {
         if (!res.ok) throw new Error('Error al cargar sedes');
         return res.json();
@@ -163,7 +163,7 @@ export default function App({ navigation }) {
 
   const loadCompletedCourses = async () => {
     try {
-      const response = await fetch(`http://192.168.100.38:3000/api/cursos/completados/${user.id}`);
+      const response = await fetch(`http://192.168.100.19:3000/api/cursos/completados/${user.id}`);
       if (response.ok) {
         const data = await response.json();
         setCompletedCoursesList(data);
@@ -242,7 +242,7 @@ export default function App({ navigation }) {
     setIsValidating(true);
 
     try {
-      const res = await fetch("http://192.168.100.38:3000/api/cursos/validar", {
+      const res = await fetch("http://192.168.100.19:3000/api/cursos/validar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 

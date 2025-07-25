@@ -10,6 +10,8 @@ import {
 } from 'react-native';
 import { Image } from "expo-image";
 
+const API_URL = 'http://10.169.169.134:3000/api/auth';
+
 export default function Continuar({ navigation }) {
   const [progress, setProgress] = useState(0.20);
   const [matricula, setMatricula] = useState("");
@@ -24,7 +26,7 @@ export default function Continuar({ navigation }) {
 
     setLoading(true);
     try {
-      const response = await fetch('http://192.168.100.38:3000/api/auth/register', {
+      const response = await fetch(`${API_URL}/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -35,7 +37,7 @@ export default function Continuar({ navigation }) {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Error al registrar');
+        throw new Error(data.message || 'Error al registrar');
       }
 
       setProgress(progress + 0.20);
